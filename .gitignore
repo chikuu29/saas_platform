@@ -1,0 +1,54 @@
+# Root-level ignores for the parent repo.
+# App-specific Python/Node artifacts are handled by each subproject's .gitignore.
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.crt
+secrets/
+
+# Logs and runtime files
+logs/
+*.log
+*.out
+*.err
+*.pid
+*.pid.lock
+
+# Coverage, caches, and test artifacts
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+coverage/
+htmlcov/
+
+# Dependency and build tooling
+node_modules/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Infrastructure state
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Editors and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
