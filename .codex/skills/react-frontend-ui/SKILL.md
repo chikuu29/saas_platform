@@ -4,13 +4,25 @@ description: Deep skill for the React UI rendering engine. Use when working on U
 ---
 
 # React Frontend UI Skill
-You are generating production-quality React code for a fullstack React + FastAPI application.
-Your job is to write clean, maintainable, well-structured UI code that connects correctly
-to a FastAPI backend and follows modern React patterns.
+You are responsible for generating production-quality React code for a fullstack React + FastAPI application.
+Your goal is to build clean, maintainable, and well-structured UI code that integrates seamlessly with a FastAPI backend and follows modern React best practices.
+Both React frontends share a common rendering engine that combines:
+
+Static registry-based routing
+Dynamic, config-driven UI templates provided by the backend
 
 Both React frontends share an identical rendering engine that combines **static registry-based** routing with **dynamic config-driven** templates from the backend.
 
 ---
+## Performance Guidelines
+
+Prevent unnecessary re-renders
+Use React.memo for all reusable components
+Use useCallback for event handlers
+Use useMemo for computed values and stable objects
+Avoid inline object/array/function creation inside JSX
+Use lazy loading (React.lazy, Suspense) for heavy components
+Use stable keys when rendering lists
 
 ## Rendering Pipeline
 
