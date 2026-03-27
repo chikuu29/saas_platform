@@ -44,6 +44,7 @@ saas_platform/
 
 - `.github/`
   Used for GitHub Actions, CI/CD workflows, templates, and repository automation.
+  This folder belongs to the repository itself. It is not related to your personal GitHub SSH key settings.
 
 - `apps/`
   Contains the actual product applications. These are the main codebases you work on.
@@ -180,6 +181,15 @@ Other Docker commands:
 ```powershell
 .\sync-all-projects.ps1
 ```
+
+### Git SSH setup
+
+If GitHub SSH is not configured yet, follow:
+
+[docs/git-ssh-setup.md](d:/Development/saas_platform/docs/git-ssh-setup.md)
+
+Note:
+`.github/` is a repository folder for workflows and templates, while GitHub SSH keys are managed in your GitHub account settings.
 
 ## Notes
 
