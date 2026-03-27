@@ -1,4 +1,0 @@
-interface:
-  display_name: "SaaS FastAPI"
-  short_description: "Work on the FastAPI backends in this repo."
-  default_prompt: "Use this skill when updating the identity_server or work_space FastAPI backends in this repo."

@@ -1,4 +1,4 @@
 interface:
-  display_name: "SaaS Frontend"
+  display_name: "react-frontend-ui"
   short_description: "Work on the React frontends in this repo."
   default_prompt: "Use this skill when updating the identity_server or work_space frontend apps in this repo."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workspace Config Generator"
+  short_description: "Generate and extend config-driven workspace pages in this repo."
+  default_prompt: "Use this skill when creating or updating apps/work_space/web DB_CONFIG templates or frontend-rendered JSON page configs."
