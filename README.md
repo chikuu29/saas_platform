@@ -191,9 +191,16 @@ If GitHub SSH is not configured yet, follow:
 Note:
 `.github/` is a repository folder for workflows and templates, while GitHub SSH keys are managed in your GitHub account settings.
 
+### LLM workflow
+
+For repo-specific agent workflow and local skills, see:
+
+[docs/llm-workflow.md](d:/Development/saas_platform/docs/llm-workflow.md)
+
 ## Notes
 
 - The root repo is an orchestration repository, not the main application codebase.
 - The projects under `apps/` are nested Git repositories.
 - Docker persistent data lives under `docker-data/` so local DB files do not mix with source code.
 - Only folder placeholders such as `.gitkeep` should be tracked inside `docker-data/`. Generated database files, Redis data, logs, and other runtime artifacts should remain untracked.
+

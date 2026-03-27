@@ -1,0 +1,4 @@
+interface:
+  display_name: "SaaS Dev Infra"
+  short_description: "Work on Docker, scripts, and local dev infra in this repo."
+  default_prompt: "Use this skill when updating docker compose files, dev scripts, git orchestration, or infra docs in this repo."
