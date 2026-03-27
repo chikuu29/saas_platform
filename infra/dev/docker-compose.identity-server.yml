@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  identity-web:
+    build:
+      context: ../../apps/identity_server/web
+    container_name: identity-web
+    depends_on:
+      - identity-backend
+    ports:
+      - "80:80"
+    environment:
+      VITE_API_URL: /api/
+      VITE_X_Client_ID: LOCAL_BASELINE
+
+  identity-backend:
+    build:
+      context: ../../apps/identity_server/backend
+    container_name: identity-backend
+    depends_on:
+      - identity-postgres
+      - identity-redis
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: development
+      DATABASE_URL: postgresql://postgres:password@identity-postgres:5432/identity_provider_database
+      REDIS_URL: redis://identity-redis:6379/0
+      DOMAIN_NAME: http://localhost:8000
+
+  identity-postgres:
+    image: postgres:15
+    container_name: identity-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: identity_provider_database
+    volumes:
+      - ../../docker-data/identity-server/postgres:/var/lib/postgresql/data
+
+  identity-redis:
+    image: redis:7-alpine
+    container_name: identity-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ../../docker-data/identity-server/redis:/data
+

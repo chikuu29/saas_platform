@@ -45,6 +45,10 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+docker-data/**
+!docker-data/
+!docker-data/**/
+!docker-data/**/.gitkeep
 
 # Editors and OS files
 .vscode/

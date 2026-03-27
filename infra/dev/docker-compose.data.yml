@@ -1,0 +1,52 @@
+services:
+  identity-postgres:
+    image: postgres:15
+    container_name: identity-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: identity_provider_database
+    volumes:
+      - ../../docker-data/identity-server/postgres:/var/lib/postgresql/data
+
+  identity-redis:
+    image: redis:7-alpine
+    container_name: identity-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ../../docker-data/identity-server/redis:/data
+
+  workspace-mongodb:
+    image: mongo:7
+    container_name: workspace-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: workspace_admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: workspace_db
+    volumes:
+      - ../../docker-data/workspace/mongodb:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+
+  workspace-mongo-express:
+    image: mongo-express
+    container_name: workspace-mongo-express
+    restart: always
+    depends_on:
+      - workspace-mongodb
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: workspace_admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+      ME_CONFIG_MONGODB_SERVER: workspace-mongodb
+      ME_CONFIG_MONGODB_AUTH_DATABASE: admin
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123

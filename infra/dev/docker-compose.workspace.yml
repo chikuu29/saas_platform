@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  workspace-backend:
+    build:
+      context: ../../apps/work_space/backend
+    container_name: workspace-backend
+    depends_on:
+      - workspace-mongodb
+    ports:
+      - "7000:7000"
+    env_file:
+      - ../../apps/work_space/backend/.env.development
+
+  workspace-web:
+    build:
+      context: ../../apps/work_space/web
+    container_name: workspace-web
+    depends_on:
+      - workspace-backend
+    ports:
+      - "5173:80"
+    environment:
+      VITE_API_URL: http://localhost:7000/v1/
+      VITE_X_CLIENT_ID: LOCAL_BASELINE
+      VITE_OAUTH_URL: http://localhost:8000/oauth/authorize
+      VITE_CLIENT_ID: work_space_platform
+      VITE_REDIRECT_URL: http://localhost:5173/auth/callback
+
+  workspace-mongodb:
+    image: mongo:7
+    container_name: workspace-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: workspace_admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: workspace_db
+    volumes:
+      - ../../docker-data/workspace/mongodb:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+
+  workspace-mongo-express:
+    image: mongo-express
+    container_name: workspace-mongo-express
+    restart: always
+    depends_on:
+      - workspace-mongodb
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: workspace_admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+      ME_CONFIG_MONGODB_SERVER: workspace-mongodb
+      ME_CONFIG_MONGODB_AUTH_DATABASE: admin
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+
