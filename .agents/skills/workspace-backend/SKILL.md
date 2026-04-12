@@ -13,7 +13,7 @@ The Workspace Backend serves the **business logic layer** — dynamic UI templat
 
 ```mermaid
 graph TD
-    subgraph Workspace["Workspace Server :7000"]
+    subgraph Workspace["Workspace Server :8001"]
         MAIN[app/main.py] --> API[app/api/]
         MAIN --> MODULES[app/modules/]
         MODULES --> SYSTEM[modules/system — UI templates, configs, menus]
@@ -31,7 +31,7 @@ graph TD
 ```
 
 - **Path**: `apps/work_space/backend`
-- **Port**: `7000`
+- **Port**: `8001`
 - **Entrypoint**: `app.main:app`
 - **Database**: MongoDB (Motor async driver)
 - **Package manager**: `uv`
@@ -405,5 +405,5 @@ async def create_item(
 ```powershell
 cd apps\work_space\backend
 uv sync
-uv run uvicorn app.main:app --port 7000 --reload
+uv run uvicorn app.main:app --port 8001 --reload
 ```

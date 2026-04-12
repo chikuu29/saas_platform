@@ -26,7 +26,7 @@ graph TD
 
     FE1[Identity Frontend :5174] --> Identity
     FE2[Workspace Frontend :5173] -.->|Token validation| Identity
-    WBE[Workspace Backend :7000] -.->|JWKS / Introspect| Identity
+    WBE[Workspace Backend :8001] -.->|JWKS / Introspect| Identity
 ```
 
 - **Path**: `apps/identity_server/backend`

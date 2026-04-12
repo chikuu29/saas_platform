@@ -26,7 +26,7 @@ $projects = @(
         Path = Join-Path $root "apps\work_space\backend"
         InstallCommand = "uv sync"
         DependencyPath = ".venv"
-        Command = "uv run uvicorn app.main:app --port 7000 --reload"
+        Command = "uv run uvicorn app.main:app --port 8001 --reload"
     },
     @{
         Name = "workspace-web"

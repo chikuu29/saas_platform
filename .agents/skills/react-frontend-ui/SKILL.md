@@ -241,7 +241,7 @@ Register new widgets in `core/widgets/index.ts`.
 
 | API | Backend | Purpose |
 |:---|:---|:---|
-| `GET /app/ui_template?pageName=X&appName=Y` | Workspace `:7000` | Fetch JSON UI template |
+| `GET /app/ui_template?pageName=X&appName=Y` | Workspace `:8001` | Fetch JSON UI template |
 | `POST /auth/login` | Identity `:8000` | User authentication |
 | `GET /auth/session` | Identity `:8000` | Session validation |
 | `GET /oauth/authorize` | Identity `:8000` | OAuth2 authorization |

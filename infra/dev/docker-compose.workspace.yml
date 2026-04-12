@@ -8,7 +8,7 @@ services:
     depends_on:
       - workspace-mongodb
     ports:
-      - "7000:7000"
+      - "8001:8001"
     env_file:
       - ../../apps/work_space/backend/.env.development
 
@@ -21,7 +21,7 @@ services:
     ports:
       - "5173:80"
     environment:
-      VITE_API_URL: http://localhost:7000/v1/
+      VITE_API_URL: http://localhost:8001/v1/
       VITE_X_CLIENT_ID: LOCAL_BASELINE
       VITE_OAUTH_URL: http://localhost:8000/oauth/authorize
       VITE_CLIENT_ID: work_space_platform
@@ -56,4 +56,3 @@ services:
       ME_CONFIG_MONGODB_AUTH_DATABASE: admin
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin123
-

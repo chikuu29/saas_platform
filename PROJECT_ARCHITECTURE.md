@@ -482,7 +482,7 @@ The repo includes a combined Docker Compose setup in `infra/dev/docker-compose.d
 | `identity-backend` | `8000` | Identity FastAPI backend |
 | `identity-postgres` | `5432` | Identity PostgreSQL |
 | `identity-redis` | `6379` | Sessions, rate limit, cache |
-| `workspace-backend` | `7000` | Workspace FastAPI backend |
+| `workspace-backend` | `8001` | Workspace FastAPI backend |
 | `workspace-web` | `3001` in Docker | Workspace frontend |
 | `workspace-mongodb` | `27017` | Workspace MongoDB |
 | `workspace-mongo-express` | `8081` | Mongo admin UI |

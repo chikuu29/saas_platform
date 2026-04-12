@@ -56,3 +56,4 @@ docker-data/**
 .DS_Store
 Thumbs.db
 Desktop.ini
+docker-data/identity-server/postgres
