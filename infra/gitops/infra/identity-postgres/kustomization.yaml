@@ -4,5 +4,6 @@ resources:
   - namespace.yaml
   - pvc.yaml
   - sealed-secret.yaml
+  - identity-app-secret.yaml
   - statefulset.yaml
   - service.yaml
