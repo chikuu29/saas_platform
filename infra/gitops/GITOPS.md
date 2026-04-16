@@ -19,7 +19,7 @@
 10. [How ArgoCD Works Day-to-Day](#10-how-argocd-works-day-to-day)
 11. [How Grafana Monitoring Works](#11-how-grafana-monitoring-works)
 12. [Deploying a Code Change (GitOps Flow)](#12-deploying-a-code-change-gitops-flow)
-13. [Troubleshooting](#13-troubleshooting)
+13. [Troubleshooting](#13-troubleshooting) 
 
 ---
 
