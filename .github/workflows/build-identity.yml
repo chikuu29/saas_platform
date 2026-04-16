@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: true
 
       # ── Build Identity Backend ────────────────────────────────────────────
       - name: Set up Docker Buildx
