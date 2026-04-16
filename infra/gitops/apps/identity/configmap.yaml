@@ -1,5 +1,5 @@
 # Non-secret runtime configuration for identity-backend.
-# Secrets (DATABASE_URL, REDIS_URL, SECRET_KEY etc.) are in SealedSecrets only.
+# Secrets (DATABASE_URL, SECRET_KEY etc.) are in SealedSecrets only.
 # This ConfigMap holds environment variables that are safe to version-control.
 apiVersion: v1
 kind: ConfigMap
@@ -11,6 +11,8 @@ data:
   DOMAIN_NAME: "http://identity.local"
   CORS_ORIGINS: "http://identity.local,http://workspace.local,http://localhost"
   POLICY_ENGINE: "local"
+  # Redis — internal Kubernetes DNS (ClusterIP service in identity namespace)
+  REDIS_URL: "redis://identity-redis:6379/0"
   # Token lifetimes (seconds)
   ACCESS_TOKEN_EXPIRY: "900"
   REFRESH_TOKEN_EXPIRY: "1296000"
@@ -25,3 +27,4 @@ data:
   SMTP_PORT: "587"
   SMTP_USE_TLS: "true"
   FROM_NAME: "SaaS Platform"
+
