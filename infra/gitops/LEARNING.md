@@ -881,3 +881,433 @@ When you run `bootstrap-local.ps1` for the first time, here is the exact order:
 | See pod logs | `kubectl logs -n identity -l app=identity-backend` |
 | Force ArgoCD to re-sync | `kubectl annotate app <name> -n argocd argocd.argoproj.io/refresh=normal --overwrite` |
 | Check all app statuses | `kubectl get app -n argocd` |
+
+---
+
+## 14. Monitoring Deep Dive — Every Component Explained
+
+> The entire monitoring stack is installed by one Helm chart: `kube-prometheus-stack`.
+> It bundles 5 tools that work together. Understanding each one is key to using them.
+
+---
+
+### The Full Monitoring Data Flow
+
+```
+Your App Pod                       Kubernetes Cluster
+┌─────────────────┐               ┌────────────────────────────────────────┐
+│ identity-backend│               │        kube-state-metrics              │
+│ /metrics endpoint│              │  "how many pods are running? replicas?"│
+└────────┬────────┘               └───────────────┬────────────────────────┘
+         │ expose numbers                         │ expose cluster state
+         ▼                                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│                     PROMETHEUS                               │
+│  Scrapes /metrics from every pod every 15 seconds           │
+│  Stores numbers in a time-series database (15 days)         │
+└───────────────────────────┬──────────────────────────────────┘
+                            │ query language (PromQL)
+              ┌─────────────┴──────────────┐
+              ▼                            ▼
+┌─────────────────────┐      ┌─────────────────────────┐
+│    GRAFANA          │      │    ALERTMANAGER          │
+│  Draws charts from  │      │  Receives alert when    │
+│  Prometheus data    │      │  Prometheus rule fires  │
+│  http://grafana.local│     │  Sends you an email     │
+└─────────────────────┘      └─────────────────────────┘
+
+Separately — for logs (text output, not numbers):
+
+┌─────────────┐    ┌──────────┐    ┌─────────┐    ┌──────────┐
+│  Any Pod    │───▶│ Promtail │───▶│  Loki   │◀───│ Grafana  │
+│ stdout logs │    │(DaemonSet│    │ log DB  │    │ Explore  │
+└─────────────┘    │ on every │    └─────────┘    └──────────┘
+                   │  node)   │
+                   └──────────┘
+```
+
+---
+
+### 1. Prometheus — The Metrics Brain
+
+**What is it?**
+Prometheus is a database that stores numbers over time. It is purpose-built for
+metrics — things like "requests per second", "CPU usage %", "error count", "memory MB".
+
+**What does it collect?**
+Every 15 seconds, Prometheus makes an HTTP GET request to each pod's `/metrics`
+endpoint. The response looks like:
+
+```
+# Counter: how many HTTP requests have been handled
+http_requests_total{method="GET", status="200"} 1547
+http_requests_total{method="POST", status="500"} 3
+
+# Gauge: current memory in bytes
+process_resident_memory_bytes 52428800
+
+# Histogram: request duration distribution
+http_request_duration_seconds_bucket{le="0.1"} 1423
+http_request_duration_seconds_bucket{le="0.5"} 1498
+http_request_duration_seconds_bucket{le="2.0"} 1547
+```
+
+**Why is it a pull model (Prometheus asks the app)?**
+Not push (app sends to Prometheus). This is intentional:
+- Prometheus controls the scrape rate — no app can flood it
+- If a pod dies, Prometheus immediately detects it (no more data)
+- New pods are auto-discovered — no registration needed
+
+**Query Language: PromQL**
+To use Prometheus data, you write PromQL expressions:
+```promql
+# Request rate over last 5 minutes
+rate(http_requests_total[5m])
+
+# Error percentage
+rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100
+
+# 99th percentile latency
+histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+```
+
+**Accessed at:** `http://prometheus.local`
+**Stores data:** 15 days (configured in `values.yaml` `retention: 15d`)
+**Uses PVC:** `10Gi` of disk for the time-series database
+
+---
+
+### 2. Grafana — The Dashboard UI
+
+**What is it?**
+Grafana is purely a visualization tool. It does NOT store any data. It connects to
+data sources (Prometheus, Loki) and draws charts, graphs, and tables from them.
+
+**Login:**
+- URL: `http://grafana.local`
+- Username: `admin`
+- Password: `admin` (set in `values.yaml` → `adminPassword: "admin"`)
+
+**What does it show?**
+Anything you write a PromQL query for. Our `platform-overview.yaml` ConfigMap
+pre-loads a dashboard with:
+- Identity backend request rate (requests per second)
+- Workspace backend request rate
+- 5xx error count for both services
+- Pod ready count per namespace
+- p99 latency chart for both services
+
+**How dashboards are auto-loaded:**
+```
+monitoring/dashboards/platform-overview.yaml
+    │
+    │ kind: ConfigMap
+    │ labels:
+    │   grafana_dashboard: "1"   ← magic label
+    │
+    ▼
+Grafana sidecar container watches ALL ConfigMaps in monitoring namespace
+    │ finds label grafana_dashboard: "1"
+    ▼
+Loads the JSON inside automatically into Grafana UI
+    ← No clicking "Import" in the UI required
+```
+
+**Data Sources (pre-configured):**
+- **Prometheus** — for all metrics (auto-configured by the Helm chart)
+- **Loki** — for logs (added via `additionalDataSources` in `values.yaml`)
+
+**Three containers in the Grafana pod:**
+1. `grafana` — the main Grafana server
+2. `grafana-sc-dashboard` — sidecar that watches ConfigMaps for dashboards
+3. `grafana-sc-datasources` — sidecar that watches ConfigMaps for datasource config
+
+---
+
+### 3. Alertmanager — The Notification Engine
+
+**What is it?**
+Alertmanager receives alerts from Prometheus and decides who to notify, how, and when.
+
+**Important distinction:**
+- **Prometheus** decides WHEN an alert fires (evaluates the rule)
+- **Alertmanager** decides WHERE to send it (email, Slack, PagerDuty, etc.)
+
+**The flow:**
+```
+prometheus-rules.yaml defines:
+  "If error rate > 1% for 5 minutes → fire alert called IdentityBackendHighErrorRate"
+         │
+         ▼
+Prometheus evaluates this rule every 30 seconds
+         │
+         ▼ (condition is true for 5 minutes)
+         ▼
+Prometheus sends alert to Alertmanager
+         │
+         ▼
+Alertmanager reads alertmanager-config.yaml:
+  "Critical alerts → email to admin@gmail.com within 10 seconds"
+  "Warning alerts  → email to admin@gmail.com, repeat every 6 hours"
+         │
+         ▼
+Gmail receives the alert email ✅
+```
+
+**Key Alertmanager features:**
+- **Grouping**: Bundles 50 alerts about the same service into 1 email
+- **Inhibition**: If a pod is down, suppress its latency alerts (root cause known)
+- **Silencing**: Snooze an alert for 2 hours during planned maintenance
+- **Routing**: Different alert severities → different receivers
+
+**Our alert rules (`prometheus-rules.yaml` — added after CRDs are installed):**
+
+| Alert Name | Fires When | Severity |
+|---|---|---|
+| `IdentityBackendHighErrorRate` | Error rate > 1% for 5 min | Critical |
+| `WorkspaceBackendHighErrorRate` | Error rate > 1% for 5 min | Critical |
+| `IdentityBackendHighLatency` | p99 latency > 2s for 5 min | Warning |
+| `WorkspaceBackendHighLatency` | p99 latency > 2s for 5 min | Warning |
+| `PodCrashLooping` | Pod restarted > 3 times in 10 min | Critical |
+| `PodNotReady` | Pod not Ready for 5 min | Warning |
+| `PVCHighUsage` | Disk volume > 80% full | Warning |
+| `HighMemoryUsage` | Container memory > 90% of limit | Warning |
+
+**Accessed at:** `http://alertmanager.local`
+
+---
+
+### 4. Node Exporter — Hardware Metrics
+
+**What is it?**
+Node Exporter is a small program that runs on every Kubernetes **node** (physical
+or virtual machine) and exposes hardware-level metrics.
+
+**What does it collect?**
+```
+# CPU usage
+node_cpu_seconds_total{cpu="0", mode="idle"} 7823.45
+
+# Memory
+node_memory_MemAvailable_bytes 1073741824   # 1GB free
+
+# Disk
+node_filesystem_avail_bytes{mountpoint="/"} 52428800
+
+# Network
+node_network_receive_bytes_total{device="eth0"} 1234567890
+```
+
+**How it runs:**
+As a **DaemonSet** — one Node Exporter pod on every cluster node automatically.
+In k3d you have 3 nodes (server + 2 agents), so you get 3 Node Exporter pods.
+
+```bash
+kubectl get pods -n monitoring | grep node-exporter
+# kube-prometheus-stack-prometheus-node-exporter-gfrzk   1/1 Running  (node 1)
+# kube-prometheus-stack-prometheus-node-exporter-xgxw6   1/1 Running  (node 2)
+# kube-prometheus-stack-prometheus-node-exporter-zwg4f   1/1 Running  (node 3)
+```
+
+**Why is it separate from Prometheus?**
+Prometheus collects APPLICATION metrics (from your code).
+Node Exporter collects MACHINE metrics (CPU, disk, RAM of the host).
+They're different concerns, so they're different tools.
+
+**Grafana dashboards using it:** "Node CPU Usage", "Memory Available", "Disk I/O"
+
+---
+
+### 5. kube-state-metrics — Kubernetes State Metrics
+
+**What is it?**
+kube-state-metrics watches the Kubernetes API server and converts Kubernetes object
+states into Prometheus metrics.
+
+**The key difference from Node Exporter:**
+```
+Node Exporter:        "The machine has 2GB RAM free"  (hardware/OS)
+kube-state-metrics:   "Pod identity-backend is in Pending state"  (K8s objects)
+```
+
+**What it exposes:**
+```
+# Is this deployment at its desired replica count?
+kube_deployment_status_replicas{deployment="identity-backend"} 2
+kube_deployment_status_replicas_available{deployment="identity-backend"} 2
+
+# Pod phase
+kube_pod_status_phase{pod="identity-backend-abc123", phase="Running"} 1
+
+# Is the pod ready?
+kube_pod_status_ready{pod="identity-backend-abc123", condition="true"} 1
+
+# PVC usage
+kube_persistentvolumeclaim_status_phase{pvc="identity-postgres-pvc"} "Bound"
+```
+
+**Why we need it:**
+Without kube-state-metrics, Prometheus has no way to know if a Deployment has
+the right number of replicas, or if a pod is crashing. It only knows what apps
+expose themselves via /metrics.
+
+kube-state-metrics bridges the gap — it translates the Kubernetes API into
+Prometheus-compatible numbers.
+
+**Used in our alert rules:**
+```yaml
+# PodNotReady alert uses kube-state-metrics data:
+expr: kube_pod_status_ready{namespace=~"identity|workspace", condition="true"} == 0
+```
+
+---
+
+### 6. Loki — Log Storage
+
+**What is it?**
+Loki is a log aggregation system built by Grafana Labs. It stores the text output
+(stdout/stderr) from all your pods in a searchable, time-indexed database.
+
+**How is it different from Prometheus?**
+```
+Prometheus: stores NUMBERS over time  (metrics)
+            "request rate was 50 req/s at 2:00pm"
+
+Loki:       stores TEXT over time  (logs)
+            "2:00pm | ERROR | identity-backend | Database connection refused"
+```
+
+**Why use Loki instead of just `kubectl logs`?**
+- `kubectl logs` only shows current pod — if the pod has restarted, old logs are gone
+- Loki keeps ALL logs from ALL pods for days/weeks
+- You can search across ALL services at once: "show me all lines containing ERROR from
+  the last 2 hours across identity AND workspace namespaces"
+- Grafana shows logs alongside metrics on the same dashboard
+
+**Query Language: LogQL**
+```logql
+# All error logs from identity namespace in last 1 hour
+{namespace="identity"} |= "ERROR"
+
+# Logs from identity-backend containing "database"
+{app="identity-backend"} |~ "(?i)database"
+
+# Rate of error lines per minute
+rate({namespace="identity"} |= "ERROR" [1m])
+```
+
+**Accessed via:** Grafana → Explore → Select "Loki" datasource
+
+---
+
+### 7. Promtail — The Log Collector
+
+**What is it?**
+Promtail is the agent that runs on every node, reads pod log files, and ships them
+to Loki. Think of it as the "log shipper".
+
+**How it runs:**
+As a **DaemonSet** — one Promtail pod on every node, always.
+
+```bash
+kubectl get pods -n monitoring | grep promtail
+# loki-stack-promtail-5ld5j   1/1 Running  (node 1)
+# loki-stack-promtail-hjsks   1/1 Running  (node 2)
+# loki-stack-promtail-m6trw   1/1 Running  (node 3)
+```
+
+**How it works:**
+```
+Pod identity-backend writes to stdout:
+  "2026-04-17 02:00 | ERROR | Redis connection refused"
+         │
+         ▼  (Kubernetes writes stdout to a file on the node)
+/var/log/pods/identity_identity-backend-abc_xxx/identity-backend/0.log
+         │
+         ▼  (Promtail reads this file continuously)
+Promtail reads, attaches labels (namespace, pod, container)
+         │
+         ▼
+Ships to Loki: http://loki-stack:3100
+         │
+         ▼
+Loki stores → Grafana can query
+```
+
+**Automatic label attachment:**
+Promtail automatically adds these labels to every log line:
+- `namespace` = `identity`
+- `pod` = `identity-backend-85f65d5d5-9r64d`
+- `container` = `identity-backend`
+- `app` = `identity-backend`
+
+This is why LogQL `{namespace="identity"}` just works — no code changes in your app.
+
+---
+
+### How All 7 Monitoring Components Work Together
+
+```
+                        ┌─────────────────────────────┐
+                        │     GRAFANA  (UI Layer)      │
+                        │   http://grafana.local       │
+                        │                              │
+                        │  Dashboards ◄── ConfigMaps   │
+                        │  (auto-loaded via sidecar)   │
+                        └──────────┬──────────┬────────┘
+                                   │          │
+              ┌────────────────────▼─┐    ┌───▼────┐
+              │     PROMETHEUS       │    │  LOKI  │
+              │  Numbers database    │    │  Log   │
+              │  http://prometheus   │    │  text  │
+              │        .local        │    │   DB   │
+              └──┬────────┬──────────┘    └───▲────┘
+                 │        │                   │
+        ┌────────▼─┐  ┌───▼──────────┐   ┌───┴──────┐
+        │ALERTMANAGER│ │ SCRAPERS     │   │ PROMTAIL │
+        │Sends emails│ │             │   │(DaemonSet│
+        │http://alert│ │ node-exporter│  │ per node)│
+        │manager.local│ │kube-state-  │  └──────────┘
+        └────────────┘ │ metrics     │
+                       │ your /metrics│
+                       └─────────────┘
+```
+
+---
+
+### What To Look At When Something Goes Wrong
+
+| Symptom | Tool | What to check |
+|---|---|---|
+| Pod is crashing | **Loki** | Search `{app="identity-backend"} \|= "ERROR"` |
+| High CPU on a node | **Node Exporter → Grafana** | Node CPU dashboard |
+| Deployment stuck at 1/2 ready | **kube-state-metrics → Prometheus** | `kube_deployment_status_replicas_available` |
+| API error rate spike | **Prometheus** | `rate(http_requests_total{status=~"5.."}[5m])` |
+| Got an alert email | **Alertmanager** | `http://alertmanager.local` — see what fired |
+| Want to explore logs | **Grafana Explore** | Select Loki, use LogQL |
+
+---
+
+### Grafana Login & First Steps
+
+```
+URL:      http://grafana.local
+Username: admin
+Password: admin
+```
+
+**Step 1 — View the Platform Dashboard:**
+Grafana → Dashboards → Browse → "SaaS Platform — Overview"
+(Auto-loaded from `monitoring/dashboards/platform-overview.yaml`)
+
+**Step 2 — Explore Logs:**
+Grafana → Explore → Select "Loki" datasource
+Enter: `{namespace="identity"}` → Run Query
+
+**Step 3 — Write a PromQL query:**
+Grafana → Explore → Select "Prometheus" datasource
+Enter: `rate(http_requests_total[5m])` → Run Query
+
+**Step 4 — See active alerts:**
+Grafana → Alerting → Alert Rules  (or visit `http://alertmanager.local`)
+
