@@ -1,45 +1,44 @@
 # NGINX Ingress for Identity services.
 #
-# Routing rules:
-#   identity.local/api/ → identity-backend:8000  (FastAPI — all /auth, /oauth2, etc.)
-#   identity.local/     → identity-web:80         (React SPA — catch-all)
+# Routing rules (after rewrite strips the /api prefix):
+#   identity.local/api/(...) → identity-backend:8000/(...) (FastAPI routes have no /api prefix)
+#   identity.local/.well-known → identity-backend:8000/.well-known
+#   identity.local/health      → identity-backend:8000/health
+#   identity.local/            → identity-web:80  (React SPA — catch-all)
 #
-# NGINX processes rules in order: more specific paths (/api) win over catch-all (/).
-# proxy_pass preserves the /api prefix — FastAPI sees the full path including /api.
-# If you want to strip /api before FastAPI, add the rewrite annotation below.
+# The rewrite-target strips /api so FastAPI receives /oauth2/token not /api/oauth2/token.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: identity-ingress
   namespace: identity
   annotations:
-    # Use the NGINX Ingress Controller (not Traefik)
     kubernetes.io/ingress.class: "nginx"
-    # Enable CORS at the NGINX level — FastAPI also handles CORS but this is a safety net
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/cors-allow-origin: "http://identity.local,http://workspace.local"
-    # Increase timeouts for slow FastAPI startup or long auth operations
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
-    # Buffer size for large JWT token responses
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
-    # Forward real client IP to FastAPI for rate limiting
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    # Strip /api prefix before forwarding to FastAPI.
+    # /api/auth/me  → FastAPI sees /auth/me
+    # /api/oauth2/token → FastAPI sees /oauth2/token
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
     - host: identity.local
       http:
         paths:
-          # API routes → FastAPI backend (more specific path listed first)
-          - path: /api
-            pathType: Prefix
+          # /api/(...) → identity-backend — regex strips /api prefix via rewrite-target
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: identity-backend
                 port:
                   number: 8000
-          # Well-known OIDC paths → also served by FastAPI backend
+          # Well-known OIDC paths → FastAPI backend (no rewrite needed)
           - path: /.well-known
             pathType: Prefix
             backend:
@@ -47,7 +46,7 @@ spec:
                 name: identity-backend
                 port:
                   number: 8000
-          # Health and metrics → backend (not proxied through React)
+          # Health probe passthrough → backend directly
           - path: /health
             pathType: Prefix
             backend:
@@ -70,3 +69,4 @@ spec:
                 name: identity-web
                 port:
                   number: 80
+
