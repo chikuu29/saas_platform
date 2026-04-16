@@ -7,5 +7,5 @@ resources:
   - identity-backend-service.yaml
   - identity-backend-hpa.yaml
   - identity-web-deployment.yaml
-  - identity-web-service.yaml
   - ingress.yaml
+
