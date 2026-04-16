@@ -14,7 +14,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/cchiku1999/saas_platform.git
+    repoURL: https://github.com/chikuu29/saas_platform.git
     targetRevision: HEAD
     path: infra/gitops/apps/identity
   destination:
