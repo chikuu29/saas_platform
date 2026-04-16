@@ -5,6 +5,7 @@
 name: Build Identity Server
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths:

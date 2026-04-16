@@ -4,6 +4,7 @@
 name: Build Workspace Platform
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths:
