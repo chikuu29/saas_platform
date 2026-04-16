@@ -30,3 +30,4 @@ spec:
       - ApplyOutOfSyncOnly=true
       # StatefulSets need this to avoid PVC recreation on plan changes
       - RespectIgnoreDifferences=true
+      - ServerSideApply=true
