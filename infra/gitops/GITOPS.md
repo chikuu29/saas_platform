@@ -983,6 +983,33 @@ kubectl describe pod -n identity -l app=identity-backend
 | Prometheus not scraping FastAPI | Missing annotations on pod | Check `prometheus.io/scrape: "true"` annotation in deployment YAML |
 | Grafana shows "No data" | Prometheus not yet scraping | Give Prometheus 2-3 minutes after deploy, check `prometheus.local/targets` |
 
+### 🚨 Critical Gotchas (Submodules & CI/CD)
+
+Since your apps (`apps/identity_server`, etc.) are **Git Submodules**, you must observe these strict rules to prevent pipeline failures:
+
+#### 1. The "Two-Step Push" Rule
+When you edit code inside an app (e.g., Python or React), running `git push` from the root `saas_platform` folder will **NOT** push your changes. You must:
+1. `cd` into the submodule folder (`cd apps/identity_server/backend`) and `git push` the code there first.
+2. `cd` back out to the root repository (`cd ../../../`), `git add apps/identity_server/backend`, and `git push` to tell the main repository to update its pointer.
+
+#### 2. ArgoCD "Permission Denied" on Submodules
+If ArgoCD fails to sync with `git@github.com: Permission denied (publickey)`, it means your `.gitmodules` file is trying to use SSH instead of HTTPS. 
+**Fix**: Edit `.gitmodules` and change `git@github.com:User/Repo.git` to `https://github.com/User/Repo.git`.
+
+#### 3. GitHub Actions "Repository not found" during Checkout
+Even with `submodules: true`, GitHub Actions will fail to clone submodules if they are **Private Repositories** under your account.
+**Fix**: 
+1. Create a Personal Access Token (PAT) with `repo` scope.
+2. Add it to GitHub Secrets as `GH_PAT`.
+3. Update your `.github/workflows/*.yml` checkout step to use it:
+```yaml
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          submodules: true
+```
+
 ### Reset everything and start fresh
 
 ```powershell
