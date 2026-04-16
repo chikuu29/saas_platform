@@ -5,10 +5,8 @@
 grafana:
   enabled: true
   adminUser: admin
-  # Admin password comes from a Kubernetes secret (create via kubeseal)
-  adminPassword: ""    # Override via grafana-admin-secret SealedSecret
-  existingSecret: "grafana-admin-secret"
-  adminPasswordKey: "GF_SECURITY_ADMIN_PASSWORD"
+  # Inline password for local dev — change for production via SealedSecret
+  adminPassword: "admin"
 
   # Expose via Traefik ingress at grafana.local
   ingress:

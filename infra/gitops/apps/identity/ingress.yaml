@@ -1,16 +1,17 @@
-# NGINX Ingress for Identity services.
+# Identity Ingress — Split into two Ingress resources.
 #
-# Routing rules (after rewrite strips the /api prefix):
-#   identity.local/api/(...) → identity-backend:8000/(...) (FastAPI routes have no /api prefix)
-#   identity.local/.well-known → identity-backend:8000/.well-known
-#   identity.local/health      → identity-backend:8000/health
-#   identity.local/            → identity-web:80  (React SPA — catch-all)
+# WHY TWO INGRESS RESOURCES?
+# nginx.ingress.kubernetes.io/rewrite-target is a PER-INGRESS annotation.
+# If set on one Ingress with multiple paths, it applies to ALL paths.
+# This breaks the React SPA path (/) because $2 has no match → NGINX breaks.
 #
-# The rewrite-target strips /api so FastAPI receives /oauth2/token not /api/oauth2/token.
+# Solution: One Ingress for /api (with rewrite), one for everything else (no rewrite).
+
+# ─── Ingress 1: API routes → FastAPI backend (strips /api prefix) ────────────
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: identity-ingress
+  name: identity-ingress-api
   namespace: identity
   annotations:
     kubernetes.io/ingress.class: "nginx"
@@ -20,9 +21,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
-    # Strip /api prefix before forwarding to FastAPI.
-    # /api/auth/me  → FastAPI sees /auth/me
-    # /api/oauth2/token → FastAPI sees /oauth2/token
+    # Strip /api prefix: /api/auth/me → FastAPI receives /auth/me
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
@@ -30,7 +29,6 @@ spec:
     - host: identity.local
       http:
         paths:
-          # /api/(...) → identity-backend — regex strips /api prefix via rewrite-target
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
@@ -38,15 +36,32 @@ spec:
                 name: identity-backend
                 port:
                   number: 8000
-          # Well-known OIDC paths → FastAPI backend (no rewrite needed)
-          - path: /.well-known
-            pathType: Prefix
+          # Well-known OIDC paths — no rewrite needed, FastAPI has these at root
+          - path: /.well-known(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: identity-backend
                 port:
                   number: 8000
-          # Health probe passthrough → backend directly
+---
+# ─── Ingress 2: Health/metrics passthrough + React SPA (no rewrite) ──────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: identity-ingress-web
+  namespace: identity
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: identity.local
+      http:
+        paths:
+          # Health probes — direct to backend, no rewrite
           - path: /health
             pathType: Prefix
             backend:
@@ -61,7 +76,7 @@ spec:
                 name: identity-backend
                 port:
                   number: 8000
-          # Everything else → React SPA
+          # React SPA — catch-all, NGINX in pod serves index.html
           - path: /
             pathType: Prefix
             backend:
@@ -69,4 +84,3 @@ spec:
                 name: identity-web
                 port:
                   number: 80
-
