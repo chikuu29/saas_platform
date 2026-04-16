@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - pvc.yaml
   - sealed-secret.yaml
+  - workspace-app-secret.yaml
   - configmap-init.yaml
   - statefulset.yaml
   - service.yaml

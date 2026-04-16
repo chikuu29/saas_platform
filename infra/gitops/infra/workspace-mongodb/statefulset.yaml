@@ -47,16 +47,18 @@ spec:
                 - mongosh
                 - --eval
                 - "db.adminCommand('ping')"
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 5
           readinessProbe:
             exec:
               command:
                 - mongosh
                 - --eval
                 - "db.adminCommand('ping')"
-            initialDelaySeconds: 15
-            periodSeconds: 5
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
       volumes:
         - name: mongodb-data
           persistentVolumeClaim:
