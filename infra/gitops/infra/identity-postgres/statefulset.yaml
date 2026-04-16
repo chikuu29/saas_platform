@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: identity-postgres
+  namespace: identity
+  labels:
+    app: identity-postgres
+    app.kubernetes.io/part-of: saas-platform
+spec:
+  serviceName: identity-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity-postgres
+  template:
+    metadata:
+      labels:
+        app: identity-postgres
+    spec:
+      # Ensure pod is rescheduled on node failure with data intact
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          # Credentials injected from SealedSecret → Kubernetes Secret
+          envFrom:
+            - secretRef:
+                name: identity-postgres-secret
+          env:
+            - name: POSTGRES_DB
+              value: identity_provider_database
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: identity-postgres-pvc

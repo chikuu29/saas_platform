@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-init-script
+  namespace: workspace
+data:
+  # Ported from infra/dev/init-mongo.js — runs once on first container start.
+  # Creates the workspace_db and seeds an initial health record to confirm
+  # the database is ready for application use.
+  init-mongo.js: |
+    db = db.getSiblingDB("workspace_db");
+
+    db.createCollection("app_health");
+    db.app_health.updateOne(
+      { name: "workspace" },
+      {
+        $set: {
+          name: "workspace",
+          initializedAt: new Date(),
+          status: "ready"
+        }
+      },
+      { upsert: true }
+    );

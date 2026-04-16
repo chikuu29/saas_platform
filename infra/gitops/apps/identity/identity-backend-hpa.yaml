@@ -1,0 +1,33 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: identity-backend-hpa
+  namespace: identity
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: identity-backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # Scale up when average CPU across all pods exceeds 70%
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      # Stabilize for 5 minutes before scaling down to prevent flapping
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      # Scale up aggressively but stabilize for 60s before further scaling
+      stabilizationWindowSeconds: 60

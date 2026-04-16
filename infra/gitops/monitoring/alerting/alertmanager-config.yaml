@@ -1,0 +1,98 @@
+# Alertmanager configuration — routes alerts to Gmail SMTP.
+# This manifest is a Kubernetes Secret because it contains SMTP credentials.
+#
+# IMPORTANT: Replace SMTP_USERNAME and SMTP_APP_PASSWORD below and seal this
+# via kubeseal before committing. Follow same process as other SealedSecrets.
+#
+# Gmail SMTP requirements:
+#   1. Enable 2FA on your Google account
+#   2. Generate an "App Password" at: https://myaccount.google.com/apppasswords
+#   3. Use that App Password as smtp_auth_password (not your main password)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-kube-prometheus-stack
+  namespace: monitoring
+type: Opaque
+stringData:
+  # AlertManager config embedded as a Secret key
+  alertmanager.yaml: |
+    global:
+      # How long to wait before resending the same alert
+      resolve_timeout: 5m
+      smtp_smarthost: 'smtp.gmail.com:587'
+      smtp_from: 'YOUR_GMAIL@gmail.com'
+      smtp_auth_username: 'YOUR_GMAIL@gmail.com'
+      # Use Gmail App Password (not your account password)
+      smtp_auth_password: 'YOUR_GMAIL_APP_PASSWORD'
+      smtp_require_tls: true
+
+    # Template for email notifications
+    templates:
+      - '/etc/alertmanager/config/*.tmpl'
+
+    route:
+      # Default catch-all receiver
+      receiver: 'gmail-notifications'
+      group_by: ['alertname', 'namespace', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+
+      routes:
+        # Critical alerts get their own immediate route
+        - match:
+            severity: critical
+          receiver: gmail-critical
+          group_wait: 10s
+          repeat_interval: 1h
+
+        # Warnings go to standard receiver
+        - match:
+            severity: warning
+          receiver: gmail-notifications
+          repeat_interval: 6h
+
+    receivers:
+      - name: gmail-notifications
+        email_configs:
+          - to: 'YOUR_GMAIL@gmail.com'
+            subject: '[SaaS Platform] {{ .GroupLabels.alertname }} - {{ .Status | toUpper }}'
+            body: |
+              {{ range .Alerts }}
+              Alert: {{ .Annotations.summary }}
+              Status: {{ .Status }}
+              Severity: {{ .Labels.severity }}
+              Service: {{ .Labels.service }}
+              Description: {{ .Annotations.description }}
+              Started: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+              Runbook: {{ .Annotations.runbook }}
+              ---
+              {{ end }}
+
+      - name: gmail-critical
+        email_configs:
+          - to: 'YOUR_GMAIL@gmail.com'
+            subject: '🚨 CRITICAL [SaaS Platform] {{ .GroupLabels.alertname }}'
+            body: |
+              CRITICAL ALERT FIRED
+
+              {{ range .Alerts }}
+              Alert:       {{ .Annotations.summary }}
+              Description: {{ .Annotations.description }}
+              Service:     {{ .Labels.service }}
+              Namespace:   {{ .Labels.namespace }}
+              Pod:         {{ .Labels.pod }}
+              Started:     {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+
+              Debug: kubectl logs -n {{ .Labels.namespace }} -l app={{ .Labels.service }}
+              ---
+              {{ end }}
+
+    inhibit_rules:
+      # If a pod is down, suppress its latency/error alerts (root cause is known)
+      - source_match:
+          alertname: PodNotReady
+        target_match_re:
+          alertname: '.*HighErrorRate|.*HighLatency'
+        equal: ['namespace', 'service']

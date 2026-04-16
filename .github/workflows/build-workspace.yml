@@ -1,0 +1,74 @@
+# CI: Build and push Workspace Platform Docker images to Docker Hub.
+# Mirror of build-identity.yml — same pattern, different paths.
+
+name: Build Workspace Platform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/work_space/**'
+      - '.github/workflows/build-workspace.yml'
+
+env:
+  REGISTRY: docker.io
+  DOCKERHUB_USERNAME: cchiku1999
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push workspace-backend
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/work_space/backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push workspace-web
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/work_space/web
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-web:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update image tags in GitOps manifests
+        run: |
+          sed -i "s|docker.io/cchiku1999/saas-workspace-backend:.*|docker.io/cchiku1999/saas-workspace-backend:${{ github.sha }}|g" \
+            infra/gitops/apps/workspace/workspace-backend-deployment.yaml
+
+          sed -i "s|docker.io/cchiku1999/saas-workspace-web:.*|docker.io/cchiku1999/saas-workspace-web:${{ github.sha }}|g" \
+            infra/gitops/apps/workspace/workspace-web-deployment.yaml
+
+      - name: Commit and push GitOps manifest changes
+        run: |
+          git config user.name "GitHub Actions [Workspace CI]"
+          git config user.email "ci@users.noreply.github.com"
+          git add infra/gitops/apps/workspace/
+          git diff --staged --quiet || git commit -m "ci(workspace): update image tags to ${{ github.sha }}"
+          git push

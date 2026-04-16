@@ -1,0 +1,27 @@
+# Non-secret runtime configuration for identity-backend.
+# Secrets (DATABASE_URL, REDIS_URL, SECRET_KEY etc.) are in SealedSecrets only.
+# This ConfigMap holds environment variables that are safe to version-control.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: identity-backend-config
+  namespace: identity
+data:
+  ENV: "production"
+  DOMAIN_NAME: "http://identity.local"
+  CORS_ORIGINS: "http://identity.local,http://workspace.local,http://localhost"
+  POLICY_ENGINE: "local"
+  # Token lifetimes (seconds)
+  ACCESS_TOKEN_EXPIRY: "900"
+  REFRESH_TOKEN_EXPIRY: "1296000"
+  ID_TOKEN_EXPIRY: "3600"
+  AUTH_CODE_EXPIRY: "300"
+  # Rate limiting
+  RATE_LIMIT_LOGIN: "10"
+  RATE_LIMIT_TOKEN: "20"
+  RATE_LIMIT_WINDOW: "60"
+  # SMTP — Gmail (credentials come from SealedSecret)
+  SMTP_SERVER: "smtp.gmail.com"
+  SMTP_PORT: "587"
+  SMTP_USE_TLS: "true"
+  FROM_NAME: "SaaS Platform"

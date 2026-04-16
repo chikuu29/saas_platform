@@ -1,15 +1,15 @@
 [submodule "apps/identity_server/backend"]
 	path = apps/identity_server/backend
-	url = git@github.com:chikuu29/OWN_OAUTH_INDENTITY_PROVIDER_BACKEND.git
+	url = https://github.com/chikuu29/OWN_OAUTH_INDENTITY_PROVIDER_BACKEND.git
 
 [submodule "apps/identity_server/web"]
 	path = apps/identity_server/web
-	url = git@github.com:chikuu29/OWN_OAUTH_INDENTITY_PROVIDER_FRONTEND.git
+	url = https://github.com/chikuu29/OWN_OAUTH_INDENTITY_PROVIDER_FRONTEND.git
 
 [submodule "apps/work_space/backend"]
 	path = apps/work_space/backend
-	url = git@github.com:chikuu29/workspace-platform-fastapi.git
+	url = https://github.com/chikuu29/workspace-platform-fastapi.git
 
 [submodule "apps/work_space/web"]
 	path = apps/work_space/web
-	url = git@github.com:chikuu29/workspace-platform.git
+	url = https://github.com/chikuu29/workspace-platform.git

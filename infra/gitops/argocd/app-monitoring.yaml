@@ -1,0 +1,32 @@
+# ArgoCD Application — Observability Stack (wave 2)
+#
+# Deploys Prometheus, Grafana, Loki, Promtail, Alertmanager via Helm.
+# Wave 2 ensures applications are running before we start scraping them.
+# Uses Helm-based management via ArgoCD's native Helm support.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/cchiku1999/saas_platform.git
+    targetRevision: HEAD
+    path: infra/gitops/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      # Helm CRDs can cause conflicts — server-side apply avoids diffs
+      - ServerSideApply=true

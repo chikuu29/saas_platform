@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workspace-backend
+  namespace: workspace
+  labels:
+    app: workspace-backend
+    app.kubernetes.io/part-of: saas-platform
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: workspace-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: workspace-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: workspace-backend
+          image: docker.io/cchiku1999/saas-workspace-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8001
+              name: http
+          envFrom:
+            - configMapRef:
+                name: workspace-backend-config
+            # MONGO_URI from SealedSecret — cross-namespace DNS included in value
+            - secretRef:
+                name: workspace-mongodb-secret
+            - secretRef:
+                name: workspace-app-secret    # SECRET_KEY, OAUTH creds, etc.
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8001
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-web
+  namespace: identity
+  labels:
+    app: identity-web
+    app.kubernetes.io/part-of: saas-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity-web
+  template:
+    metadata:
+      labels:
+        app: identity-web
+    spec:
+      containers:
+        - name: identity-web
+          image: docker.io/cchiku1999/saas-identity-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            # Vite env vars are baked at build time. These are runtime Nginx envsubst vars.
+            - name: VITE_API_URL
+              value: "http://identity.local/api/"
+            - name: VITE_X_Client_ID
+              value: "PRODUCTION"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10

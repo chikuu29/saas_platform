@@ -1,0 +1,29 @@
+# ArgoCD Application — Workspace Platform (wave 1)
+#
+# Deploys workspace-backend (FastAPI) + workspace-web (React/Nginx).
+# Same wave as identity — both depend on infra (wave 0), not on each other.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-workspace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/cchiku1999/saas_platform.git
+    targetRevision: HEAD
+    path: infra/gitops/apps/workspace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: workspace
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

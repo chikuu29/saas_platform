@@ -1,0 +1,104 @@
+# Platform Overview Grafana Dashboard — provisioned via ConfigMap sidecar.
+# The grafana_dashboard: "1" label triggers auto-loading by the Grafana sidecar.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-platform-overview
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  platform-overview.json: |
+    {
+      "title": "SaaS Platform — Overview",
+      "uid": "saas-platform-overview",
+      "schemaVersion": 36,
+      "tags": ["saas", "platform", "overview"],
+      "time": { "from": "now-1h", "to": "now" },
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Identity Backend — Request Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{job=\"saas-identity-backend\"}[5m]))",
+            "legendFormat": "RPS"
+          }],
+          "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 100, "color": "yellow"}, {"value": 500, "color": "red"}] } } }
+        },
+        {
+          "id": 2,
+          "title": "Workspace Backend — Request Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{job=\"saas-workspace-backend\"}[5m]))",
+            "legendFormat": "RPS"
+          }],
+          "fieldConfig": { "defaults": { "unit": "reqps" } }
+        },
+        {
+          "id": 3,
+          "title": "Identity Backend — Error Rate (5xx)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{job=\"saas-identity-backend\", status=~\"5..\"}[5m]))",
+            "legendFormat": "5xx/s"
+          }],
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 1, "color": "red"}] } } }
+        },
+        {
+          "id": 4,
+          "title": "Workspace Backend — Error Rate (5xx)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{job=\"saas-workspace-backend\", status=~\"5..\"}[5m]))",
+            "legendFormat": "5xx/s"
+          }],
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 1, "color": "red"}] } } }
+        },
+        {
+          "id": 5,
+          "title": "Pod Status — identity namespace",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 0, "y": 4 },
+          "targets": [{
+            "expr": "count(kube_pod_status_ready{namespace=\"identity\", condition=\"true\"} == 1)",
+            "legendFormat": "Ready Pods"
+          }],
+          "fieldConfig": { "defaults": { "unit": "short" } }
+        },
+        {
+          "id": 6,
+          "title": "Pod Status — workspace namespace",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 4 },
+          "targets": [{
+            "expr": "count(kube_pod_status_ready{namespace=\"workspace\", condition=\"true\"} == 1)",
+            "legendFormat": "Ready Pods"
+          }],
+          "fieldConfig": { "defaults": { "unit": "short" } }
+        },
+        {
+          "id": 7,
+          "title": "p99 Latency — Both Services",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"saas-identity-backend\"}[5m]))",
+              "legendFormat": "Identity p99"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"saas-workspace-backend\"}[5m]))",
+              "legendFormat": "Workspace p99"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        }
+      ]
+    }

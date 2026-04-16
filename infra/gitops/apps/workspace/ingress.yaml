@@ -1,0 +1,77 @@
+# NGINX Ingress for Workspace services.
+#
+# Routing rules:
+#   workspace.local/api/      → workspace-backend:8001 (FastAPI — /api/v1/*)
+#   workspace.local/public/   → workspace-backend:8001 (Static file storage served by FastAPI)
+#   workspace.local/health    → workspace-backend:8001 (K8s probe passthrough)
+#   workspace.local/metrics   → workspace-backend:8001 (Prometheus scrape passthrough)
+#   workspace.local/          → workspace-web:80        (React SPA — catch-all)
+#
+# The workspace backend mounts /public/storage as a FastAPI StaticFiles route,
+# so /public/ must route to the backend, not the React frontend.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: workspace-ingress
+  namespace: workspace
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "http://workspace.local,http://identity.local"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    # Max body size for file uploads (workspace has file upload feature)
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    # Cache static assets from React build
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      location ~* \.(js|css|png|jpg|svg|ico|woff2?)$ {
+        expires 1d;
+        add_header Cache-Control "public";
+      }
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: workspace.local
+      http:
+        paths:
+          # FastAPI API routes (/api/v1/*)
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: workspace-backend
+                port:
+                  number: 8001
+          # Static file storage — served by FastAPI StaticFiles mount
+          - path: /public
+            pathType: Prefix
+            backend:
+              service:
+                name: workspace-backend
+                port:
+                  number: 8001
+          # Health and Prometheus metrics → backend directly
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: workspace-backend
+                port:
+                  number: 8001
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: workspace-backend
+                port:
+                  number: 8001
+          # React SPA — everything else
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: workspace-web
+                port:
+                  number: 80

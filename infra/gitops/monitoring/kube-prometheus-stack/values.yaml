@@ -1,0 +1,170 @@
+# Helm values for kube-prometheus-stack
+# Tuned for local k3d cluster — lightweight footprint, full observability enabled.
+
+# ── Grafana ────────────────────────────────────────────────────────────────────
+grafana:
+  enabled: true
+  adminUser: admin
+  # Admin password comes from a Kubernetes secret (create via kubeseal)
+  adminPassword: ""    # Override via grafana-admin-secret SealedSecret
+  existingSecret: "grafana-admin-secret"
+  adminPasswordKey: "GF_SECURITY_ADMIN_PASSWORD"
+
+  # Expose via Traefik ingress at grafana.local
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.local
+    path: /
+    pathType: Prefix
+
+  # Grafana resource allocation — modest for local dev, enough for real use
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+  # Dashboards provisioned from ConfigMaps in the monitoring namespace
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: monitoring
+    datasources:
+      enabled: true
+
+  # Pre-configure Loki datasource alongside Prometheus
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki-stack:3100
+      access: proxy
+      isDefault: false
+
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 2Gi
+
+# ── Prometheus ─────────────────────────────────────────────────────────────────
+prometheus:
+  enabled: true
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - prometheus.local
+    paths:
+      - /
+    pathType: Prefix
+
+  prometheusSpec:
+    # Retain 15 days of metrics data
+    retention: 15d
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+    # Auto-discover ServiceMonitors and PodMonitors in any namespace
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # Scrape pods annotated with prometheus.io/scrape: "true"
+    additionalScrapeConfigs:
+      - job_name: saas-identity-backend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [identity]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+      - job_name: saas-workspace-backend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [workspace]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+# ── Alertmanager ───────────────────────────────────────────────────────────────
+alertmanager:
+  enabled: true
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - alertmanager.local
+    paths:
+      - /
+    pathType: Prefix
+
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ── Node Exporter ─────────────────────────────────────────────────────────────
+nodeExporter:
+  enabled: true
+
+# ── Kube State Metrics ────────────────────────────────────────────────────────
+kubeStateMetrics:
+  enabled: true

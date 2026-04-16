@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-backend
+  namespace: identity
+  labels:
+    app: identity-backend
+    app.kubernetes.io/part-of: saas-platform
+    # prometheus.io/scrape annotation triggers ServiceMonitor auto-discovery
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+spec:
+  # HPA manages replica count — do not set replicas here when HPA is active
+  replicas: 2
+  selector:
+    matchLabels:
+      app: identity-backend
+  strategy:
+    # RollingUpdate ensures zero-downtime deploys — one old pod stays alive
+    # until new pods pass readiness before old ones are terminated.
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: identity-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: identity-backend
+          # IMAGE TAG — update this value to trigger a rolling deploy via GitOps
+          image: docker.io/cchiku1999/saas-identity-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          # Non-secret env from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: identity-backend-config
+            # Secret env injected from SealedSecret (DATABASE_URL, REDIS_URL, etc.)
+            - secretRef:
+                name: identity-postgres-secret
+            - secretRef:
+                name: identity-app-secret      # SECRET_KEY, JWT keys, SMTP creds
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # Liveness: if this fails repeatedly, Kubernetes restarts the container
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          # Readiness: pod only receives traffic when DB + Redis are healthy
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3

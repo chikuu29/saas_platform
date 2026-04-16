@@ -1,0 +1,32 @@
+# ArgoCD Application — Infrastructure Layer (wave 0)
+#
+# Deploys all stateful data stores: PostgreSQL, Redis, MongoDB.
+# Must sync BEFORE apps (wave 1) since backends depend on the databases.
+# Sealed Secrets controller is also in this wave so secrets decrypt before pods start.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-infra
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/cchiku1999/saas_platform.git
+    targetRevision: HEAD
+    path: infra/gitops/infra
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra   # Resources themselves specify their own namespaces
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      # StatefulSets need this to avoid PVC recreation on plan changes
+      - RespectIgnoreDifferences=true

@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - identity-backend-deployment.yaml
+  - identity-backend-service.yaml
+  - identity-backend-hpa.yaml
+  - identity-web-deployment.yaml
+  - identity-web-service.yaml
+  - ingress.yaml

@@ -1,0 +1,29 @@
+# ArgoCD Application — Identity Server (wave 1)
+#
+# Deploys identity-backend (FastAPI) + identity-web (React/Nginx).
+# Wave 1 ensures infra (databases) is healthy before identity pods start.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-identity
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/cchiku1999/saas_platform.git
+    targetRevision: HEAD
+    path: infra/gitops/apps/identity
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: identity
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

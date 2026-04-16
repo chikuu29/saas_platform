@@ -1,0 +1,82 @@
+# CI: Build and push Identity Server Docker images to Docker Hub.
+# Triggers on any push that changes identity server code.
+# After push, updates the GitOps image tag so ArgoCD auto-deploys.
+
+name: Build Identity Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/identity_server/**'
+      - '.github/workflows/build-identity.yml'
+
+env:
+  REGISTRY: docker.io
+  DOCKERHUB_USERNAME: cchiku1999
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # Needed to commit updated image tags back to repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Build Identity Backend ────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push identity-backend
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/identity_server/backend
+          push: true
+          # Tag with both git SHA (immutable) and latest (convenience)
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-identity-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-identity-backend:latest
+          # BuildKit cache — speeds up subsequent builds significantly
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push identity-web
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/identity_server/web
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-identity-web:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-identity-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Update GitOps manifests with new image tags ───────────────────────
+      # ArgoCD polls the repo — this commit triggers the rolling deploy.
+      - name: Update image tags in GitOps manifests
+        run: |
+          # Update identity-backend image tag
+          sed -i "s|docker.io/cchiku1999/saas-identity-backend:.*|docker.io/cchiku1999/saas-identity-backend:${{ github.sha }}|g" \
+            infra/gitops/apps/identity/identity-backend-deployment.yaml
+
+          # Update identity-web image tag
+          sed -i "s|docker.io/cchiku1999/saas-identity-web:.*|docker.io/cchiku1999/saas-identity-web:${{ github.sha }}|g" \
+            infra/gitops/apps/identity/identity-web-deployment.yaml
+
+      - name: Commit and push GitOps manifest changes
+        run: |
+          git config user.name "GitHub Actions [Identity CI]"
+          git config user.email "ci@users.noreply.github.com"
+          git add infra/gitops/apps/identity/
+          git diff --staged --quiet || git commit -m "ci(identity): update image tags to ${{ github.sha }}"
+          git push

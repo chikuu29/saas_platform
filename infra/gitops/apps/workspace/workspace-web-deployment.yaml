@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workspace-web
+  namespace: workspace
+  labels:
+    app: workspace-web
+    app.kubernetes.io/part-of: saas-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workspace-web
+  template:
+    metadata:
+      labels:
+        app: workspace-web
+    spec:
+      containers:
+        - name: workspace-web
+          image: docker.io/cchiku1999/saas-workspace-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: VITE_API_URL
+              value: "http://workspace.local/api/v1/"
+            - name: VITE_X_CLIENT_ID
+              value: "PRODUCTION"
+            - name: VITE_OAUTH_URL
+              value: "http://identity.local/oauth2/authorize"
+            - name: VITE_CLIENT_ID
+              value: "work_space_platform"
+            - name: VITE_REDIRECT_URL
+              value: "http://workspace.local/auth/callback"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10

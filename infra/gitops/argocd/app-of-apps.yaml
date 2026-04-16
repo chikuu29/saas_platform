@@ -1,0 +1,39 @@
+# ArgoCD App-of-Apps — Root Application
+#
+# This is the single Application that ArgoCD is bootstrapped with manually.
+# It watches infra/gitops/argocd/ and creates all child Applications from there.
+# Sync wave -1 ensures this is always processed first.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    # Cascade delete — deleting this app removes all child apps + resources
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/cchiku1999/saas_platform.git
+    targetRevision: HEAD
+    # Path inside the monorepo where child app manifests live.
+    # ArgoCD picks up ALL Application CRDs in this directory:
+    #   nginx-ingress.yaml   (wave -1) — NGINX Ingress Controller via Helm
+    #   sealed-secrets in app-infra (wave 0) — secret decryption
+    #   app-infra.yaml       (wave 0) — PostgreSQL, Redis, MongoDB
+    #   app-identity.yaml    (wave 1) — identity-backend + identity-web
+    #   app-workspace.yaml   (wave 1) — workspace-backend + workspace-web
+    #   app-monitoring.yaml  (wave 2) — Prometheus + Grafana + Loki
+    path: infra/gitops/argocd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true      # Remove resources deleted from Git
+      selfHeal: true   # Revert manual kubectl changes
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

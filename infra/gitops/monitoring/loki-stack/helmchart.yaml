@@ -1,0 +1,55 @@
+# Loki Stack — lightweight log aggregation.
+# Promtail (DaemonSet) ships pod logs → Loki → Grafana Explore.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    chart: loki-stack
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 2.10.2
+    helm:
+      releaseName: loki-stack
+      values: |
+        loki:
+          enabled: true
+          persistence:
+            enabled: true
+            storageClassName: local-path
+            size: 5Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+        promtail:
+          enabled: true
+          # Promtail runs as DaemonSet — scrapes all pod logs on every node
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+        grafana:
+          # Grafana is managed by kube-prometheus-stack — disable here
+          enabled: false
+        prometheus:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
