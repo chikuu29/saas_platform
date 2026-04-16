@@ -138,7 +138,7 @@ Write-Host "  Scopes needed: repo (read access only)" -ForegroundColor Yellow
 Write-Host ""
 
 $githubPAT = Read-Host "Enter your GitHub PAT"
-argocd repo add $GithubRepo --username chikuu29 --password $githubPAT
+argocd repo add $GithubRepo --username chikuu29 --password $githubPAT --upsert
 
 # -- Step 7: Bootstrap App-of-Apps --------------------------------------------
 
@@ -151,7 +151,8 @@ argocd app create app-of-apps `
     --dest-namespace argocd `
     --sync-policy automated `
     --auto-prune `
-    --self-heal
+    --self-heal `
+    --upsert
 
 argocd app sync app-of-apps --timeout 60
 

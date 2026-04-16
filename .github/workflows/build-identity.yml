@@ -6,7 +6,7 @@ name: Build Identity Server
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'apps/identity_server/**'
       - '.github/workflows/build-identity.yml'

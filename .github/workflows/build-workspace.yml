@@ -5,7 +5,7 @@ name: Build Workspace Platform
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'apps/work_space/**'
       - '.github/workflows/build-workspace.yml'
