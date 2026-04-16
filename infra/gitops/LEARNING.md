@@ -21,6 +21,8 @@
 11. [The Sync Wave System — Deployment Order](#11-the-sync-wave-system)
 12. [Full File Reference — Every YAML Explained](#12-full-file-reference)
 13. [How It All Boots From Zero](#13-how-it-all-boots-from-zero)
+14. [Monitoring Deep Dive — Every Component Explained](#14-monitoring-deep-dive--every-component-explained)
+15. [kubectl Command Reference — Every Command You Need](#15-kubectl-command-reference)
 
 ---
 
@@ -1310,4 +1312,395 @@ Enter: `rate(http_requests_total[5m])` → Run Query
 
 **Step 4 — See active alerts:**
 Grafana → Alerting → Alert Rules  (or visit `http://alertmanager.local`)
+
+---
+
+## 15. kubectl Command Reference
+
+> **Read this like a dictionary.** Find what you need, copy the command.
+> Replace `<name>`, `<namespace>`, `<image>` with real values from your cluster.
+
+---
+
+### 🔍 GET — View Resources
+
+```bash
+# ── List ALL ArgoCD apps and their status ─────────────────────────────────────
+kubectl get app -n argocd
+
+# ── List pods in a namespace ──────────────────────────────────────────────────
+kubectl get pods -n identity
+kubectl get pods -n workspace
+kubectl get pods -n monitoring
+kubectl get pods -n argocd
+kubectl get pods -n ingress-nginx
+
+# ── List pods across ALL namespaces ───────────────────────────────────────────
+kubectl get pods -A
+
+# ── List pods with extra info (node, IP) ──────────────────────────────────────
+kubectl get pods -n identity -o wide
+
+# ── List all services (internal DNS entries) ──────────────────────────────────
+kubectl get svc -n identity
+kubectl get svc -n workspace
+kubectl get svc -A
+
+# ── List all Ingress rules ────────────────────────────────────────────────────
+kubectl get ingress -A
+
+# ── List persistent volumes and claims ───────────────────────────────────────
+kubectl get pvc -A
+kubectl get pv
+
+# ── List ConfigMaps ───────────────────────────────────────────────────────────
+kubectl get configmap -n identity
+kubectl get configmap -n monitoring
+
+# ── List Secrets (names only — values are hidden) ────────────────────────────
+kubectl get secret -n identity
+kubectl get secret -n workspace
+
+# ── List all namespaces ───────────────────────────────────────────────────────
+kubectl get namespace
+
+# ── List nodes in the cluster ─────────────────────────────────────────────────
+kubectl get nodes
+kubectl get nodes -o wide     # shows IP, OS, kernel version
+
+# ── List deployments ──────────────────────────────────────────────────────────
+kubectl get deployment -n identity
+kubectl get deployment -n workspace
+
+# ── List statefulsets (databases) ─────────────────────────────────────────────
+kubectl get statefulset -n identity
+kubectl get statefulset -n workspace
+
+# ── List HorizontalPodAutoscalers ─────────────────────────────────────────────
+kubectl get hpa -n identity
+kubectl get hpa -n workspace
+```
+
+---
+
+### 📋 DESCRIBE — Deep Inspection
+
+```bash
+# ── Describe a pod (shows events, env vars, image, error reasons) ─────────────
+kubectl describe pod <pod-name> -n identity
+# Example:
+kubectl describe pod identity-backend-85f65d5d5-9r64d -n identity
+
+# ── Describe a deployment ─────────────────────────────────────────────────────
+kubectl describe deployment identity-backend -n identity
+kubectl describe deployment workspace-backend -n workspace
+
+# ── Describe a service ────────────────────────────────────────────────────────
+kubectl describe svc identity-backend -n identity
+
+# ── Describe an ingress (shows routing rules) ─────────────────────────────────
+kubectl describe ingress identity-ingress-api -n identity
+
+# ── Describe a node ───────────────────────────────────────────────────────────
+kubectl describe node k3d-saas-cluster-server-0
+
+# ── Describe a PVC (shows if Bound or Pending) ───────────────────────────────
+kubectl describe pvc identity-postgres-pvc -n identity
+
+# ── Describe a sealed secret (shows decrypt error if any) ────────────────────
+kubectl describe sealedsecret identity-postgres-secret -n identity
+
+# ── Describe an ArgoCD app (shows all resources and their sync status) ────────
+kubectl describe app app-infra -n argocd
+```
+
+---
+
+### 📜 LOGS — View Pod Output
+
+```bash
+# ── Get logs from a pod ───────────────────────────────────────────────────────
+kubectl logs <pod-name> -n identity
+
+# ── Stream logs live (follow) ────────────────────────────────────────────────
+kubectl logs -f <pod-name> -n identity
+
+# ── Get last 100 lines ────────────────────────────────────────────────────────
+kubectl logs <pod-name> -n identity --tail=100
+
+# ── Logs from ALL pods of a deployment (by label) ────────────────────────────
+kubectl logs -n identity -l app=identity-backend
+kubectl logs -n workspace -l app=workspace-backend
+
+# ── Stream logs from ALL pods of a deployment ────────────────────────────────
+kubectl logs -n identity -l app=identity-backend -f
+
+# ── Logs from a specific container inside a multi-container pod ───────────────
+kubectl logs <pod-name> -n monitoring -c grafana
+kubectl logs <pod-name> -n monitoring -c grafana-sc-dashboard
+
+# ── Logs from a pod that previously crashed (previous instance) ───────────────
+kubectl logs <pod-name> -n identity --previous
+
+# ── Get logs since last 30 minutes ────────────────────────────────────────────
+kubectl logs <pod-name> -n identity --since=30m
+```
+
+---
+
+### ⚡ APPLY — Deploy or Update Resources
+
+```bash
+# ── Apply a single YAML file ──────────────────────────────────────────────────
+kubectl apply -f infra/gitops/apps/identity/ingress.yaml
+
+# ── Apply an entire directory ─────────────────────────────────────────────────
+kubectl apply -f infra/gitops/apps/identity/
+
+# ── Apply using kustomize (same as ArgoCD does internally) ───────────────────
+kubectl apply -k infra/gitops/apps/identity/
+
+# ── Dry-run — see what WOULD be applied without actually doing it ─────────────
+kubectl apply -f <file.yaml> --dry-run=client
+kubectl apply -k infra/gitops/apps/identity/ --dry-run=client
+
+# ── Force replace a resource (deletes and recreates) ─────────────────────────
+kubectl replace --force -f <file.yaml>
+```
+
+---
+
+### 🗑️ DELETE — Remove Resources
+
+```bash
+# ── Delete a pod (Kubernetes recreates it automatically) ──────────────────────
+kubectl delete pod <pod-name> -n identity
+
+# ── Force delete a stuck/terminating pod ─────────────────────────────────────
+kubectl delete pod <pod-name> -n identity --force --grace-period=0
+
+# ── Delete a deployment ───────────────────────────────────────────────────────
+kubectl delete deployment identity-backend -n identity
+
+# ── Delete an ingress ────────────────────────────────────────────────────────
+kubectl delete ingress identity-ingress -n identity
+
+# ── Delete from YAML file ────────────────────────────────────────────────────
+kubectl delete -f <file.yaml>
+```
+
+---
+
+### 🔬 EXEC — Run Commands Inside a Pod
+
+```bash
+# ── Open an interactive shell inside a pod ────────────────────────────────────
+kubectl exec -it <pod-name> -n identity -- /bin/sh
+kubectl exec -it <pod-name> -n identity -- /bin/bash
+
+# ── Run a single command inside a pod ────────────────────────────────────────
+kubectl exec -n identity <pod-name> -- ls /app
+kubectl exec -n identity <pod-name> -- env | grep DATABASE
+
+# ── Test database connection from inside a pod ────────────────────────────────
+kubectl exec -it identity-postgres-0 -n identity -- psql -U postgres -d identitydb
+
+# ── Test Redis from inside a pod ──────────────────────────────────────────────
+kubectl exec -it identity-redis-0 -n identity -- redis-cli ping
+
+# ── Test MongoDB from inside a pod ────────────────────────────────────────────
+kubectl exec -it workspace-mongodb-0 -n workspace -- mongosh
+```
+
+---
+
+### 🌐 PORT-FORWARD — Access Services Directly (bypassing Ingress)
+
+```bash
+# ── Access identity backend directly on localhost:8000 ────────────────────────
+kubectl port-forward -n identity svc/identity-backend 8000:8000
+
+# ── Access workspace backend directly on localhost:8001 ───────────────────────
+kubectl port-forward -n workspace svc/workspace-backend 8001:8001
+
+# ── Access PostgreSQL directly on localhost:5432 ──────────────────────────────
+kubectl port-forward -n identity svc/identity-postgres 5432:5432
+
+# ── Access Redis directly on localhost:6379 ───────────────────────────────────
+kubectl port-forward -n identity svc/identity-redis 6379:6379
+
+# ── Access MongoDB directly on localhost:27017 ────────────────────────────────
+kubectl port-forward -n workspace svc/workspace-mongodb 27017:27017
+
+# ── Access Grafana directly (useful if Ingress is broken) ────────────────────
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+# Then open: http://localhost:3000
+
+# ── Access Prometheus directly ────────────────────────────────────────────────
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+# Then open: http://localhost:9090
+```
+
+---
+
+### 📊 TOP — Resource Usage (CPU & Memory)
+
+```bash
+# ── CPU and memory usage per node ────────────────────────────────────────────
+kubectl top nodes
+
+# ── CPU and memory usage per pod ─────────────────────────────────────────────
+kubectl top pods -n identity
+kubectl top pods -n workspace
+kubectl top pods -n monitoring
+kubectl top pods -A           # all namespaces
+
+# ── Sort pods by CPU usage ────────────────────────────────────────────────────
+kubectl top pods -A --sort-by=cpu
+
+# ── Sort pods by memory usage ─────────────────────────────────────────────────
+kubectl top pods -A --sort-by=memory
+```
+
+---
+
+### 🔄 ROLLOUT — Deployments
+
+```bash
+# ── Check rollout status ─────────────────────────────────────────────────────
+kubectl rollout status deployment/identity-backend -n identity
+kubectl rollout status deployment/workspace-backend -n workspace
+
+# ── See rollout history ───────────────────────────────────────────────────────
+kubectl rollout history deployment/identity-backend -n identity
+
+# ── Rollback to the previous version ─────────────────────────────────────────
+kubectl rollout undo deployment/identity-backend -n identity
+
+# ── Restart all pods in a deployment (without changing anything) ─────────────
+kubectl rollout restart deployment/identity-backend -n identity
+kubectl rollout restart deployment/workspace-backend -n workspace
+# Use this after: changing a ConfigMap or Secret (pods don't auto-restart otherwise)
+```
+
+---
+
+### 🔐 SECRETS — Read / Debug
+
+```bash
+# ── List secrets in a namespace ───────────────────────────────────────────────
+kubectl get secret -n identity
+
+# ── See what keys a secret contains (not values) ─────────────────────────────
+kubectl get secret identity-postgres-secret -n identity -o jsonpath='{.data}' | python -c "import sys,json; [print(k) for k in json.load(sys.stdin)]"
+
+# ── Decode a specific secret value ────────────────────────────────────────────
+# PowerShell:
+$b64 = kubectl get secret identity-postgres-secret -n identity -o jsonpath='{.data.POSTGRES_PASSWORD}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64))
+
+# ── See all environment variables a pod has (includes secrets) ────────────────
+kubectl exec <pod-name> -n identity -- env
+
+# ── List SealedSecrets and their decrypt status ───────────────────────────────
+kubectl get sealedsecret -n identity
+kubectl describe sealedsecret identity-postgres-secret -n identity
+```
+
+---
+
+### 🚀 ArgoCD CLI — GitOps Operations
+
+```bash
+# ── See all apps ─────────────────────────────────────────────────────────────
+argocd app list --server argocd.local --insecure --grpc-web
+
+# ── Get detail on one app ─────────────────────────────────────────────────────
+argocd app get app-infra --server argocd.local --insecure --grpc-web
+
+# ── Manually sync an app (pull latest Git changes NOW) ───────────────────────
+argocd app sync app-identity --server argocd.local --insecure --grpc-web
+argocd app sync app-monitoring --server argocd.local --insecure --grpc-web
+argocd app sync app-infra --server argocd.local --insecure --grpc-web
+
+# ── Force a hard refresh (re-reads Git, ignores cache) ───────────────────────
+kubectl annotate app app-monitoring -n argocd argocd.argoproj.io/refresh=hard --overwrite
+
+# ── Terminate a stuck sync operation ─────────────────────────────────────────
+argocd app terminate-op app-monitoring --server argocd.local --insecure --grpc-web
+
+# ── Sync ALL apps at once ─────────────────────────────────────────────────────
+argocd app sync -l argocd.argoproj.io/app --server argocd.local --insecure --grpc-web
+```
+
+---
+
+### 🆘 Emergency Commands
+
+```bash
+# ── Something is wrong — what's happening in a namespace? ─────────────────────
+kubectl get events -n identity --sort-by='.lastTimestamp'
+kubectl get events -n workspace --sort-by='.lastTimestamp'
+kubectl get events -A --sort-by='.lastTimestamp' | tail -20
+
+# ── Pod stuck in Pending — why? ───────────────────────────────────────────────
+kubectl describe pod <pod-name> -n identity | grep -A 5 "Events:"
+
+# ── Pod in CrashLoopBackOff — what's the error? ──────────────────────────────
+kubectl logs <pod-name> -n identity --previous
+kubectl describe pod <pod-name> -n identity
+
+# ── Pod in CreateContainerConfigError — missing secret or configmap ───────────
+kubectl describe pod <pod-name> -n identity
+# Look for: "secret X not found" or "configmap Y not found"
+
+# ── Ingress not routing — check NGINX controller logs ────────────────────────
+kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=50
+
+# ── ArgoCD stuck syncing — force unlock ──────────────────────────────────────
+argocd app terminate-op <app-name> --server argocd.local --insecure --grpc-web
+
+# ── Database pod lost data after restart (PVC check) ─────────────────────────
+kubectl get pvc -n identity
+kubectl describe pvc identity-postgres-pvc -n identity
+# Status must say "Bound" — if "Pending", storage provisioner failed
+
+# ── Nuclear option: delete and recreate a pod ─────────────────────────────────
+kubectl delete pod <pod-name> -n identity --force --grace-period=0
+# Kubernetes auto-recreates it from the Deployment/StatefulSet spec
+
+# ── Check cluster resource capacity ───────────────────────────────────────────
+kubectl describe nodes | grep -A 5 "Allocated resources"
+```
+
+---
+
+### 📌 This Cluster's Namespaces Reference
+
+| Namespace | What lives there | View with |
+|---|---|---|
+| `identity` | FastAPI backend, React frontend, PostgreSQL, Redis | `kubectl get pods -n identity` |
+| `workspace` | Node.js backend, React frontend, MongoDB | `kubectl get pods -n workspace` |
+| `monitoring` | Prometheus, Grafana, Alertmanager, Loki, Promtail | `kubectl get pods -n monitoring` |
+| `argocd` | ArgoCD server, repo-server, application-controller | `kubectl get pods -n argocd` |
+| `ingress-nginx` | NGINX Ingress Controller | `kubectl get pods -n ingress-nginx` |
+| `kube-system` | Sealed Secrets controller, CoreDNS | `kubectl get pods -n kube-system` |
+
+---
+
+### 📌 This Cluster's Services Reference
+
+| Service DNS | Port | What it is |
+|---|---|---|
+| `identity-postgres.identity.svc` | 5432 | PostgreSQL |
+| `identity-redis.identity.svc` | 6379 | Redis |
+| `identity-backend.identity.svc` | 8000 | FastAPI |
+| `identity-web.identity.svc` | 80 | React (NGINX) |
+| `workspace-mongodb.workspace.svc` | 27017 | MongoDB |
+| `workspace-backend.workspace.svc` | 8001 | Node.js backend |
+| `workspace-web.workspace.svc` | 80 | React (NGINX) |
+| `kube-prometheus-stack-grafana.monitoring.svc` | 80 | Grafana |
+| `kube-prometheus-stack-prometheus.monitoring.svc` | 9090 | Prometheus |
+| `loki-stack.monitoring.svc` | 3100 | Loki |
+
 
