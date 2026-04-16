@@ -1,5 +1,6 @@
-# Platform Overview Grafana Dashboard — provisioned via ConfigMap sidecar.
-# The grafana_dashboard: "1" label triggers auto-loading by the Grafana sidecar.
+# Platform Overview Grafana Dashboard — auto-provisioned via ConfigMap sidecar.
+# The grafana_dashboard: "1" label triggers Grafana's sidecar to load this automatically.
+# Dashboard covers: CPU, Memory, HTTP requests, error rates, pod health, latency.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,95 +11,452 @@ metadata:
 data:
   platform-overview.json: |
     {
-      "title": "SaaS Platform — Overview",
+      "title": "SaaS Platform — Application Overview",
       "uid": "saas-platform-overview",
-      "schemaVersion": 36,
+      "schemaVersion": 38,
+      "version": 2,
       "tags": ["saas", "platform", "overview"],
       "time": { "from": "now-1h", "to": "now" },
       "refresh": "30s",
+      "timezone": "browser",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "label": "Namespace",
+            "type": "custom",
+            "current": { "text": "All", "value": "$__all" },
+            "options": [
+              { "text": "All", "value": "$__all", "selected": true },
+              { "text": "identity", "value": "identity" },
+              { "text": "workspace", "value": "workspace" }
+            ],
+            "includeAll": true,
+            "multi": true
+          }
+        ]
+      },
       "panels": [
+
         {
           "id": 1,
-          "title": "Identity Backend — Request Rate",
+          "title": "🟢 Running Pods",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
           "targets": [{
-            "expr": "sum(rate(http_requests_total{job=\"saas-identity-backend\"}[5m]))",
-            "legendFormat": "RPS"
+            "expr": "count(kube_pod_status_phase{namespace=~\"identity|workspace\", phase=\"Running\"})",
+            "legendFormat": "Running Pods"
           }],
-          "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 100, "color": "yellow"}, {"value": 500, "color": "red"}] } } }
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "none",
+            "orientation": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "green" },
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 1, "color": "yellow" },
+                { "value": 4, "color": "green" }
+              ]}
+            }
+          }
         },
+
         {
           "id": 2,
-          "title": "Workspace Backend — Request Rate",
+          "title": "⚠️ Pods Not Ready",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
           "targets": [{
-            "expr": "sum(rate(http_requests_total{job=\"saas-workspace-backend\"}[5m]))",
-            "legendFormat": "RPS"
+            "expr": "count(kube_pod_status_ready{namespace=~\"identity|workspace\", condition=\"true\"} == 0) OR vector(0)",
+            "legendFormat": "Not Ready"
           }],
-          "fieldConfig": { "defaults": { "unit": "reqps" } }
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 1, "color": "red" }
+              ]}
+            }
+          }
         },
+
         {
           "id": 3,
-          "title": "Identity Backend — Error Rate (5xx)",
+          "title": "🔄 Identity Backend Replicas",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
           "targets": [{
-            "expr": "sum(rate(http_requests_total{job=\"saas-identity-backend\", status=~\"5..\"}[5m]))",
-            "legendFormat": "5xx/s"
+            "expr": "kube_deployment_status_replicas_available{namespace=\"identity\", deployment=\"identity-backend\"}",
+            "legendFormat": "Available / {{deployment}}"
+          }, {
+            "expr": "kube_deployment_spec_replicas{namespace=\"identity\", deployment=\"identity-backend\"}",
+            "legendFormat": "Desired"
           }],
-          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 1, "color": "red"}] } } }
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "orientation": "horizontal"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 1, "color": "yellow" },
+                { "value": 2, "color": "green" }
+              ]}
+            }
+          }
         },
+
         {
           "id": 4,
-          "title": "Workspace Backend — Error Rate (5xx)",
+          "title": "🔄 Workspace Backend Replicas",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
           "targets": [{
-            "expr": "sum(rate(http_requests_total{job=\"saas-workspace-backend\", status=~\"5..\"}[5m]))",
-            "legendFormat": "5xx/s"
+            "expr": "kube_deployment_status_replicas_available{namespace=\"workspace\", deployment=\"workspace-backend\"}",
+            "legendFormat": "Available"
+          }, {
+            "expr": "kube_deployment_spec_replicas{namespace=\"workspace\", deployment=\"workspace-backend\"}",
+            "legendFormat": "Desired"
           }],
-          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 1, "color": "red"}] } } }
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "orientation": "horizontal"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 1, "color": "yellow" },
+                { "value": 2, "color": "green" }
+              ]}
+            }
+          }
         },
+
         {
           "id": 5,
-          "title": "Pod Status — identity namespace",
+          "title": "📈 Total HTTP Request Rate",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 12, "x": 0, "y": 4 },
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
           "targets": [{
-            "expr": "count(kube_pod_status_ready{namespace=\"identity\", condition=\"true\"} == 1)",
-            "legendFormat": "Ready Pods"
+            "expr": "sum(rate(http_requests_total{namespace=~\"identity|workspace\"}[5m]))",
+            "legendFormat": "req/s"
           }],
-          "fieldConfig": { "defaults": { "unit": "short" } }
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "fixed", "fixedColor": "blue" }
+            }
+          }
         },
+
         {
           "id": 6,
-          "title": "Pod Status — workspace namespace",
+          "title": "🚨 5xx Error Rate",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 4 },
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
           "targets": [{
-            "expr": "count(kube_pod_status_ready{namespace=\"workspace\", condition=\"true\"} == 1)",
-            "legendFormat": "Ready Pods"
+            "expr": "sum(rate(http_requests_total{namespace=~\"identity|workspace\", status=~\"5..\"}[5m]))",
+            "legendFormat": "errors/s"
           }],
-          "fieldConfig": { "defaults": { "unit": "short" } }
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 0.1, "color": "yellow" },
+                { "value": 1, "color": "red" }
+              ]}
+            }
+          }
         },
+
         {
-          "id": 7,
-          "title": "p99 Latency — Both Services",
+          "id": 10,
+          "title": "CPU Usage — By Container (identity + workspace)",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"identity|workspace\", container!=\"\", container!=\"POD\"}[5m])) by (container, namespace)",
+            "legendFormat": "{{namespace}} / {{container}}"
+          }],
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "custom": { "lineWidth": 2, "fillOpacity": 10, "gradientMode": "opacity" },
+              "color": { "mode": "palette-classic" }
+            }
+          }
+        },
+
+        {
+          "id": 11,
+          "title": "Memory Usage — By Container (identity + workspace)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=~\"identity|workspace\", container!=\"\", container!=\"POD\"}) by (container, namespace)",
+            "legendFormat": "{{namespace}} / {{container}}"
+          }],
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "lineWidth": 2, "fillOpacity": 10, "gradientMode": "opacity" },
+              "color": { "mode": "palette-classic" }
+            }
+          }
+        },
+
+        {
+          "id": 20,
+          "title": "HTTP Request Rate — Identity vs Workspace",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"saas-identity-backend\"}[5m]))",
-              "legendFormat": "Identity p99"
+              "expr": "sum(rate(http_requests_total{namespace=\"identity\"}[5m])) by (status)",
+              "legendFormat": "identity / {{status}}"
             },
             {
-              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"saas-workspace-backend\"}[5m]))",
-              "legendFormat": "Workspace p99"
+              "expr": "sum(rate(http_requests_total{namespace=\"workspace\"}[5m])) by (status)",
+              "legendFormat": "workspace / {{status}}"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "s" } }
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "last"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "lineWidth": 2, "fillOpacity": 5 },
+              "color": { "mode": "palette-classic" }
+            }
+          }
+        },
+
+        {
+          "id": 21,
+          "title": "p50 / p95 / p99 Latency — Both Services",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{namespace=\"identity\"}[5m])) by (le))",
+              "legendFormat": "identity p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"identity\"}[5m])) by (le))",
+              "legendFormat": "identity p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace=\"identity\"}[5m])) by (le))",
+              "legendFormat": "identity p99"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{namespace=\"workspace\"}[5m])) by (le))",
+              "legendFormat": "workspace p50"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace=\"workspace\"}[5m])) by (le))",
+              "legendFormat": "workspace p99"
+            }
+          ],
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "asc" },
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "lineWidth": 2 },
+              "color": { "mode": "palette-classic" }
+            }
+          }
+        },
+
+        {
+          "id": 30,
+          "title": "5xx Error Rate — Identity Backend",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 20 },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{namespace=\"identity\", status=~\"5..\"}[5m])) by (status)",
+            "legendFormat": "HTTP {{status}}"
+          }],
+          "options": {
+            "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "fixed", "fixedColor": "red" },
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            }
+          }
+        },
+
+        {
+          "id": 31,
+          "title": "5xx Error Rate — Workspace Backend",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 20 },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{namespace=\"workspace\", status=~\"5..\"}[5m])) by (status)",
+            "legendFormat": "HTTP {{status}}"
+          }],
+          "options": {
+            "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "fixed", "fixedColor": "orange" },
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            }
+          }
+        },
+
+        {
+          "id": 40,
+          "title": "Pod Restarts (Last 1h)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 26 },
+          "targets": [{
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=~\"identity|workspace\"}[1h])",
+            "legendFormat": "{{namespace}} / {{pod}}"
+          }],
+          "options": {
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 10 },
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 1, "color": "orange" },
+                { "value": 3, "color": "red" }
+              ]}
+            }
+          }
+        },
+
+        {
+          "id": 41,
+          "title": "Node CPU Usage — All Nodes",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 26 },
+          "targets": [{
+            "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "{{instance}}"
+          }],
+          "options": {
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "lineWidth": 2, "fillOpacity": 10 },
+              "color": { "mode": "palette-classic" },
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 70, "color": "yellow" },
+                { "value": 90, "color": "red" }
+              ]}
+            }
+          }
+        },
+
+        {
+          "id": 50,
+          "title": "Node Memory — Available",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 32 },
+          "targets": [{
+            "expr": "node_memory_MemAvailable_bytes",
+            "legendFormat": "{{instance}}"
+          }],
+          "options": {
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["last"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 },
+              "color": { "mode": "palette-classic" }
+            }
+          }
+        },
+
+        {
+          "id": 51,
+          "title": "PVC Disk Usage — All Databases",
+          "type": "bargauge",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 32 },
+          "targets": [{
+            "expr": "(kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100",
+            "legendFormat": "{{persistentvolumeclaim}}"
+          }],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "orientation": "horizontal",
+            "displayMode": "gradient",
+            "valueMode": "color"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 60, "color": "yellow" },
+                { "value": 80, "color": "red" }
+              ]}
+            }
+          }
         }
+
       ]
     }
