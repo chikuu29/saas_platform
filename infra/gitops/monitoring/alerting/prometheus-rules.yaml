@@ -1,10 +1,13 @@
 # PrometheusRule — Custom alert rules for the SaaS platform.
 # These CRDs are installed by kube-prometheus-stack and picked up automatically.
+# sync-wave 3 ensures this applies AFTER kube-prometheus-stack (wave 2) installs the CRD.
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: saas-platform-alerts
   namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     # This label is required for kube-prometheus-stack to discover the rules
     release: kube-prometheus-stack
