@@ -1054,3 +1054,147 @@ kubectl get secrets -n identity        # List decrypted secrets
 # ── Destroy ─────────────────────────────────────────────────
 k3d cluster delete saas-local          # Delete entire cluster
 ```
+
+---
+
+## 14. Ingress URL Routing Design
+
+### The Core Problem
+
+When a browser calls `http://identity.local/api/auth/me`, the NGINX Ingress Controller
+must decide:
+1. **Which pod** to send the request to
+2. **What path** that pod actually receives
+
+These two decisions are configured **separately** and getting them wrong causes 404s.
+
+---
+
+### The Two Strategies
+
+#### Strategy A — Backend owns the `/api` prefix (Workspace pattern)
+
+The FastAPI app registers all routes **with** the `/api/v1` prefix itself:
+
+```python
+# main.py
+app.include_router(api_router, prefix="/api/v1")
+# FastAPI routes: /api/v1/modules, /api/v1/users, etc.
+```
+
+The Ingress simply forwards `/api/...` as-is — **no rewrite needed**:
+
+```yaml
+# ingress.yaml
+- path: /api
+  pathType: Prefix
+  backend:
+    service:
+      name: workspace-backend
+      port:
+        number: 8001
+# Browser: /api/v1/users → FastAPI receives: /api/v1/users ✅
+```
+
+✅ **Used by:** `workspace-backend`
+
+---
+
+#### Strategy B — Ingress strips the prefix (Identity pattern)
+
+The FastAPI app registers routes **without** any prefix:
+
+```python
+# FastAPI routes: /auth/login, /oauth2/token, /account/register
+# NO /api prefix at all
+```
+
+The Ingress must **strip `/api`** before forwarding using `rewrite-target`:
+
+```yaml
+# ingress.yaml
+annotations:
+  nginx.ingress.kubernetes.io/rewrite-target: /$2   # Send only what's AFTER /api
+
+- path: /api(/|$)(.*)           # Regex: capture everything after /api
+  pathType: ImplementationSpecific
+  backend:
+    service:
+      name: identity-backend
+      port:
+        number: 8000
+# Browser: /api/auth/me → Ingress strips → FastAPI receives: /auth/me ✅
+# Browser: /api/oauth2/token → FastAPI receives: /oauth2/token ✅
+```
+
+✅ **Used by:** `identity-backend`
+
+---
+
+### Which Strategy is Better?
+
+| | Strategy A (Backend owns prefix) | Strategy B (Ingress strips prefix) |
+|---|---|---|
+| **Frontend calls** | `/api/v1/users` | `/api/users` |
+| **FastAPI route** | `/api/v1/users` | `/users` |
+| **Ingress complexity** | Simple `Prefix` | Regex + `rewrite-target` |
+| **Backend portability** | Can run standalone at `/api/v1` | Simpler routes, depends on Ingress |
+| **Recommendation** | ✅ Preferred for new services | Use when FastAPI has no prefix |
+
+> **Best Practice:** Use **Strategy A** for all new services. Register the API prefix
+> directly in FastAPI using `app.include_router(router, prefix="/api/v1")`. This makes
+> the backend self-documenting, testable without Kubernetes, and the Ingress stays simple.
+
+---
+
+### This Platform's URLs (Current State)
+
+| Browser URL | Handled By | FastAPI Receives | Strategy |
+|---|---|---|---|
+| `identity.local/api/auth/login` | identity-backend | `/auth/login` | B (rewrite) |
+| `identity.local/api/oauth2/token` | identity-backend | `/oauth2/token` | B (rewrite) |
+| `identity.local/api/docs` | identity-backend | `/docs` (Swagger) | B (rewrite) |
+| `identity.local/` | identity-web | Static HTML/JS | nginx in pod |
+| `workspace.local/api/v1/modules` | workspace-backend | `/api/v1/modules` | A (no rewrite) |
+| `workspace.local/` | workspace-web | Static HTML/JS | nginx in pod |
+
+---
+
+### The React Frontend Connection
+
+The React frontend uses **relative paths** — never hardcoded pod IPs:
+
+```typescript
+// src/app/api.ts
+// In production (built Docker image) reads from .env:
+VITE_API_URL="/api/"          // → calls /api/auth/login → Ingress routes it
+
+// In development (npm run dev) uses Vite proxy:
+// vite.config.ts proxy: /api → http://localhost:8000
+```
+
+**Never use absolute URLs like `http://10.42.1.16:8001/` in React** — pod IPs change
+on every restart. Relative paths work in both local dev and Kubernetes without changes.
+
+---
+
+### Quick Debugging Checklist for 404 Errors
+
+```bash
+# 1. Check backend routes actually registered
+kubectl exec -n identity deploy/identity-backend -- \
+  python3 -c "import urllib.request,json; \
+  d=json.loads(urllib.request.urlopen('http://localhost:8000/openapi.json').read()); \
+  print('\n'.join(list(d['paths'].keys())[:20]))"
+
+# 2. Check what path the Ingress is sending
+kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=20
+
+# 3. Check the Ingress rules as Kubernetes sees them
+kubectl describe ingress identity-ingress -n identity
+
+# 4. Test backend directly (bypasses Ingress entirely)
+kubectl port-forward -n identity svc/identity-backend 8000:8000
+# Then: http://localhost:8000/auth/me
+```
+
