@@ -57,3 +57,14 @@ docker-data/**
 Thumbs.db
 Desktop.ini
 docker-data/identity-server/postgres
+
+# Kubeseal — local CLI binary, never commit to Git
+kubeseal.exe
+kubeseal
+kubeseal.tar.gz
+
+# Temporary plain-text secret files created before sealing
+# NEVER commit these — they contain raw passwords!
+temp-*.yaml
+plain.yaml
+plain*.yaml

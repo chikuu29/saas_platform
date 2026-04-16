@@ -24,12 +24,6 @@ metadata:
     # Max body size for file uploads (workspace has file upload feature)
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
-    # Cache static assets from React build
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      location ~* \.(js|css|png|jpg|svg|ico|woff2?)$ {
-        expires 1d;
-        add_header Cache-Control "public";
-      }
 spec:
   ingressClassName: nginx
   rules:
