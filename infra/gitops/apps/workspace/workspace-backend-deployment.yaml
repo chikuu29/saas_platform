@@ -32,7 +32,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: workspace-backend
-          image: docker.io/cchiku1999/saas-workspace-backend:bfe61944818c7fc0dd10dd626dbb496311d2ba81
+          image: docker.io/cchiku1999/saas-workspace-backend:bb53dae31f1da6c9f095724ddc1074a3a10e1752
           imagePullPolicy: Always
           ports:
             - containerPort: 8001
