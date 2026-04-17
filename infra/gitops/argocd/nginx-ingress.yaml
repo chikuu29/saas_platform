@@ -33,6 +33,8 @@ spec:
         controller:
           # Use NodePort so k3d's port mapping (80→80) works correctly
           # Without this, the LoadBalancer would stay in <pending> state locally
+          extraArgs:
+            default-ssl-certificate: "ingress-nginx/local-wildcard-tls"
           service:
             type: NodePort
             nodePorts:
