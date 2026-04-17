@@ -62,9 +62,13 @@ docker-data/identity-server/postgres
 kubeseal.exe
 kubeseal
 kubeseal.tar.gz
+mkcert.exe
+mkcert
+mkcert.tar.gz
 
 # Temporary plain-text secret files created before sealing
 # NEVER commit these — they contain raw passwords!
 temp-*.yaml
 plain.yaml
 plain*.yaml
+
