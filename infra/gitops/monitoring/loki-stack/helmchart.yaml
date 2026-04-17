@@ -42,6 +42,9 @@ spec:
         grafana:
           # Grafana is managed by kube-prometheus-stack — disable here
           enabled: false
+          sidecar:
+            datasources:
+              enabled: false
         prometheus:
           enabled: false
   destination:

@@ -1,98 +1,16 @@
-# Alertmanager configuration — routes alerts to Gmail SMTP.
-# This manifest is a Kubernetes Secret because it contains SMTP credentials.
-#
-# IMPORTANT: Replace SMTP_USERNAME and SMTP_APP_PASSWORD below and seal this
-# via kubeseal before committing. Follow same process as other SealedSecrets.
-#
-# Gmail SMTP requirements:
-#   1. Enable 2FA on your Google account
-#   2. Generate an "App Password" at: https://myaccount.google.com/apppasswords
-#   3. Use that App Password as smtp_auth_password (not your main password)
-apiVersion: v1
-kind: Secret
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
 metadata:
+  creationTimestamp: null
   name: alertmanager-kube-prometheus-stack
   namespace: monitoring
-type: Opaque
-stringData:
-  # AlertManager config embedded as a Secret key
-  alertmanager.yaml: |
-    global:
-      # How long to wait before resending the same alert
-      resolve_timeout: 5m
-      smtp_smarthost: 'smtp.gmail.com:587'
-      smtp_from: 'YOUR_GMAIL@gmail.com'
-      smtp_auth_username: 'YOUR_GMAIL@gmail.com'
-      # Use Gmail App Password (not your account password)
-      smtp_auth_password: 'YOUR_GMAIL_APP_PASSWORD'
-      smtp_require_tls: true
-
-    # Template for email notifications
-    templates:
-      - '/etc/alertmanager/config/*.tmpl'
-
-    route:
-      # Default catch-all receiver
-      receiver: 'gmail-notifications'
-      group_by: ['alertname', 'namespace', 'service']
-      group_wait: 30s
-      group_interval: 5m
-      repeat_interval: 12h
-
-      routes:
-        # Critical alerts get their own immediate route
-        - match:
-            severity: critical
-          receiver: gmail-critical
-          group_wait: 10s
-          repeat_interval: 1h
-
-        # Warnings go to standard receiver
-        - match:
-            severity: warning
-          receiver: gmail-notifications
-          repeat_interval: 6h
-
-    receivers:
-      - name: gmail-notifications
-        email_configs:
-          - to: 'YOUR_GMAIL@gmail.com'
-            subject: '[SaaS Platform] {{ .GroupLabels.alertname }} - {{ .Status | toUpper }}'
-            body: |
-              {{ range .Alerts }}
-              Alert: {{ .Annotations.summary }}
-              Status: {{ .Status }}
-              Severity: {{ .Labels.severity }}
-              Service: {{ .Labels.service }}
-              Description: {{ .Annotations.description }}
-              Started: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
-              Runbook: {{ .Annotations.runbook }}
-              ---
-              {{ end }}
-
-      - name: gmail-critical
-        email_configs:
-          - to: 'YOUR_GMAIL@gmail.com'
-            subject: '🚨 CRITICAL [SaaS Platform] {{ .GroupLabels.alertname }}'
-            body: |
-              CRITICAL ALERT FIRED
-
-              {{ range .Alerts }}
-              Alert:       {{ .Annotations.summary }}
-              Description: {{ .Annotations.description }}
-              Service:     {{ .Labels.service }}
-              Namespace:   {{ .Labels.namespace }}
-              Pod:         {{ .Labels.pod }}
-              Started:     {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
-
-              Debug: kubectl logs -n {{ .Labels.namespace }} -l app={{ .Labels.service }}
-              ---
-              {{ end }}
-
-    inhibit_rules:
-      # If a pod is down, suppress its latency/error alerts (root cause is known)
-      - source_match:
-          alertname: PodNotReady
-        target_match_re:
-          alertname: '.*HighErrorRate|.*HighLatency'
-        equal: ['namespace', 'service']
+spec:
+  encryptedData:
+    alertmanager.yaml: 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
+  template:
+    metadata:
+      creationTimestamp: null
+      name: alertmanager-kube-prometheus-stack
+      namespace: monitoring
+    type: Opaque

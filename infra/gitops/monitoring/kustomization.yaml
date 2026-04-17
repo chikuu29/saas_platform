@@ -6,6 +6,8 @@ resources:
   - loki-stack/
   - dashboards/
   - grafana-ingress.yaml     # Standalone Ingress for grafana.local
+  - prometheus-ingress.yaml  # Standalone Ingress for prometheus.local
+  - alertmanager-ingress.yaml # Standalone Ingress for alertmanager.local
   # alerting/ uses PrometheusRule CRD — re-add after kube-prometheus-stack is fully synced
-  # - alerting/
+  - alerting/
 
