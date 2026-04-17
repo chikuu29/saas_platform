@@ -23,17 +23,14 @@ spec:
           ports:
             - containerPort: 80
               name: http
-          env:
-            - name: VITE_API_URL
-              value: "https://workspace.local/api/v1/"
-            - name: VITE_X_CLIENT_ID
-              value: "PRODUCTION"
-            - name: VITE_OAUTH_URL
-              value: "https://identity.local/oauth2/authorize"
-            - name: VITE_CLIENT_ID
-              value: "work_space_platform"
-            - name: VITE_REDIRECT_URL
-              value: "https://workspace.local/auth/callback"
+          # Runtime env vars sourced from ConfigMap.
+          # docker-entrypoint.sh reads these at pod startup and generates
+          # /env-config.js → window._env_ → consumed by React via env.ts.
+          # Update values in workspace-web-configmap.yaml, then:
+          #   kubectl apply -f ... && kubectl rollout restart deployment/workspace-web -n workspace
+          envFrom:
+            - configMapRef:
+                name: workspace-web-config
           resources:
             requests:
               cpu: 50m

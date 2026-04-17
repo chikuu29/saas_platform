@@ -1,0 +1,37 @@
+# Runtime configuration for workspace-web (nginx + React SPA).
+#
+# HOW THESE VALUES REACH THE BROWSER:
+#   1. K8s injects these as pod env vars (via envFrom in the Deployment).
+#   2. docker-entrypoint.sh reads them at container startup and writes:
+#        /usr/share/nginx/html/env-config.js  →  window._env_ = { ... }
+#   3. index.html loads env-config.js before the React bundle.
+#   4. src/app/env.ts reads window._env_ at runtime (falls back to
+#      import.meta.env in local dev where window._env_ is undefined).
+#
+# TO UPDATE: edit values here → apply → rollout restart workspace-web.
+# NO Docker image rebuild needed. ✅
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workspace-web-config
+  namespace: workspace
+data:
+  # ── Workspace backend API base URL ─────────────────────────────────────────
+  # Relative path: nginx ingress at workspace.local strips /backend → backend pod.
+  VITE_API_URL: "/backend"
+
+  # ── OAuth2 / SSO ────────────────────────────────────────────────────────────
+  # Full public URL of the identity server's authorization endpoint.
+  VITE_OAUTH_URL: "https://identity.local/api/oauth2/authorize"
+
+  # OAuth2 client ID registered in the identity server.
+  VITE_CLIENT_ID: "work_space_platform"
+
+  # Redirect URL after SSO — must match registration in identity server.
+  VITE_REDIRECT_URL: "https://workspace.local/auth/callback"
+
+  # ── Identity provider API base (for OIDC discovery, token exchange) ─────────
+  VITE_IDENTITY_PROVIDER_API_URL: "https://identity.local/api"
+
+  # ── Client identification tag ───────────────────────────────────────────────
+  VITE_X_CLIENT_ID: "PRODUCTION"
