@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - identity-backend-deployment.yaml
+  - identity-keys-pvc.yaml
   - identity-backend-service.yaml
   - identity-backend-hpa.yaml
   - identity-web-deployment.yaml

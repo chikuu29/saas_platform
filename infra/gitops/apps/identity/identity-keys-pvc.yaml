@@ -1,0 +1,30 @@
+# PersistentVolumeClaim for identity server RSA keys.
+#
+# WHY THIS EXISTS:
+# The identity server generates RSA key pairs (keys/keys.json) and signs JWTs
+# with them. Each key has a unique `kid` (key ID) that is embedded in every
+# issued token.
+#
+# If the pod restarts WITHOUT persistent storage:
+#   - keys.json is wiped → new RSA key pair generated → new kid
+#   - All previously issued tokens carry the OLD kid
+#   - JWKS endpoint returns only the NEW kid
+#   - Workspace backend: "No matching JWK found" → 401 for every user ❌
+#
+# With this PVC, keys.json survives pod restarts and rollouts so the kid
+# in existing tokens always matches the JWKS endpoint. ✅
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: identity-keys-pvc
+  namespace: identity
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
+  # Uses the default local-path storage provisioner (k3d/k3s built-in).
+  # For multi-replica deployments, change to ReadWriteMany with a shared
+  # storage provisioner (e.g., NFS, Longhorn) so all replicas share one keys.json.
+  storageClassName: local-path

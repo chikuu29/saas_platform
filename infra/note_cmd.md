@@ -78,3 +78,9 @@ kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespac
 
 20. List All Resources of All Types in All Namespaces
 kubectl get all --all-namespaces
+
+
+
+
+
+ kubectl exec -n identity deployment/identity-backend -- python3 -c "import json; d=json.load(open('/app/keys/keys.json')); print('active_kid:', d['active_kid']); print('stored kids:', list(d['keys'].keys()))"

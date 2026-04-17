@@ -74,3 +74,13 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             failureThreshold: 3
+          volumeMounts:
+            # Mount the keys directory so keys.json survives pod restarts.
+            # Without this, every restart generates a new RSA key pair → new kid
+            # → all existing tokens fail validation with "No matching JWK found".
+            - name: identity-keys
+              mountPath: /app/keys
+      volumes:
+        - name: identity-keys
+          persistentVolumeClaim:
+            claimName: identity-keys-pvc
