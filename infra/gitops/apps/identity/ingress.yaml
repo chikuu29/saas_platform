@@ -2,12 +2,19 @@
 #
 # WHY TWO INGRESS RESOURCES?
 # nginx.ingress.kubernetes.io/rewrite-target is a PER-INGRESS annotation.
-# If set on one Ingress with multiple paths, it applies to ALL paths.
-# This breaks the React SPA path (/) because $2 has no match → NGINX breaks.
+# If set on one Ingress with multiple paths, it applies to ALL paths uniformly.
+# This breaks any path that is NOT using the same capture-group structure.
 #
-# Solution: One Ingress for /api (with rewrite), one for everything else (no rewrite).
+# IMPORTANT: /.well-known MUST be in the NO-REWRITE ingress.
+# With rewrite-target: /$2, the path /.well-known/openid-configuration is
+# captured as $2="openid-configuration" and rewritten to just /openid-configuration
+# — stripping the .well-known segment. FastAPI never matches that route → 404.
+#
+# Split strategy:
+#   Ingress 1 (identity-ingress-api): /api/* only → backend (strips /api prefix)
+#   Ingress 2 (identity-ingress-web): /.well-known, /oauth2, /health, /metrics, / → no rewrite
 
-# ─── Ingress 1: API routes → FastAPI backend (strips /api prefix) ────────────
+# ─── Ingress 1: API routes → FastAPI backend (strips /api prefix) ─────────────
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -23,6 +30,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     # Strip /api prefix: /api/auth/me → FastAPI receives /auth/me
+    # $1 = "/" or "" (separator), $2 = the rest of the path
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
@@ -40,16 +48,16 @@ spec:
                 name: identity-backend
                 port:
                   number: 8000
-          # Well-known OIDC paths — no rewrite needed, FastAPI has these at root
-          - path: /.well-known(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: identity-backend
-                port:
-                  number: 8000
 ---
-# ─── Ingress 2: Health/metrics passthrough + React SPA (no rewrite) ──────────
+# ─── Ingress 2: Passthrough — no rewrite ─────────────────────────────────────
+# This ingress handles all paths that must reach FastAPI with their full path
+# intact, plus the React SPA catch-all.
+#
+# /.well-known/* — OIDC discovery + JWKS (FastAPI routes at exact these paths)
+# /oauth2/*      — protocol-level OAuth2 endpoints if ever accessed directly
+# /health        — Kubernetes liveness/readiness probes
+# /metrics       — Prometheus scrape endpoint
+# /              — React SPA (everything else → identity-web Nginx pod)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -60,6 +68,7 @@ metadata:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
 spec:
   ingressClassName: nginx
   tls:
@@ -69,6 +78,15 @@ spec:
     - host: identity.local
       http:
         paths:
+          # OIDC discovery and JWKS — MUST arrive at FastAPI with the full
+          # /.well-known/... path intact (no rewrite on this ingress)
+          - path: /.well-known
+            pathType: Prefix
+            backend:
+              service:
+                name: identity-backend
+                port:
+                  number: 8000
           # Health probes — direct to backend, no rewrite
           - path: /health
             pathType: Prefix
@@ -84,7 +102,7 @@ spec:
                 name: identity-backend
                 port:
                   number: 8000
-          # React SPA — catch-all, NGINX in pod serves index.html
+          # React SPA — catch-all; NGINX in the identity-web pod serves index.html
           - path: /
             pathType: Prefix
             backend:
