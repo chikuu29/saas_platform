@@ -8,3 +8,4 @@ resources:
   - identity-postgres/
   - identity-redis/
   - workspace-mongodb/
+  - ingress-nginx-tls-sealed.yaml
