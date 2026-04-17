@@ -16,7 +16,8 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-origin: "http://identity.local,http://workspace.local"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://identity.local,https://workspace.local"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
@@ -25,6 +26,9 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - identity.local
   rules:
     - host: identity.local
       http:
@@ -53,10 +57,14 @@ metadata:
   namespace: identity
   annotations:
     kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - identity.local
   rules:
     - host: identity.local
       http:

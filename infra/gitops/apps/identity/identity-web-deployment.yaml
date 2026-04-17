@@ -26,7 +26,7 @@ spec:
           env:
             # Vite env vars are baked at build time. These are runtime Nginx envsubst vars.
             - name: VITE_API_URL
-              value: "http://identity.local/api/"
+              value: "https://identity.local/api/"
             - name: VITE_X_Client_ID
               value: "PRODUCTION"
           resources:

@@ -8,8 +8,8 @@ metadata:
   namespace: identity
 data:
   ENV: "production"
-  DOMAIN_NAME: "http://identity.local"
-  CORS_ORIGINS: "http://identity.local,http://workspace.local,http://localhost"
+  DOMAIN_NAME: "https://identity.local"
+  CORS_ORIGINS: "https://identity.local,https://workspace.local,http://localhost"
   POLICY_ENGINE: "local"
   # Redis — internal Kubernetes DNS (ClusterIP service in identity namespace)
   REDIS_URL: "redis://identity-redis:6379/0"

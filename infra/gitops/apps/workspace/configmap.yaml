@@ -13,7 +13,7 @@ data:
   PORT: "8001"
   LOG_LEVEL: "INFO"
   DATABASE_NAME: "workspace_db"
-  BACKEND_CORS_ORIGINS: '["http://workspace.local","http://identity.local","http://localhost"]'
+  BACKEND_CORS_ORIGINS: '["https://workspace.local","https://identity.local","http://localhost"]'
   # Identity Server endpoints — cross-namespace via Kubernetes DNS
   OAUTH_OPENID_CONFIG_URL: "http://identity-backend.identity.svc.cluster.local:8000/.well-known/openid-configuration"
   OAUTH_TOKEN_URI: "http://identity-backend.identity.svc.cluster.local:8000/oauth2/token"

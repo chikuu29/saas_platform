@@ -8,6 +8,9 @@ metadata:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+    - argocd.local
   rules:
   - host: argocd.local
     http:

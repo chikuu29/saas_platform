@@ -116,7 +116,7 @@ $argoPwd = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=
     ForEach-Object { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
 
 Write-Host ""
-Write-Host "  ArgoCD URL:      http://argocd.local  (after bootstrap)" -ForegroundColor White
+Write-Host "  ArgoCD URL:      https://argocd.local  (after bootstrap)" -ForegroundColor White
 Write-Host "  ArgoCD User:     admin" -ForegroundColor White
 Write-Host "  ArgoCD Password: $argoPwd" -ForegroundColor Yellow
 Write-Host "  (Save this password!)" -ForegroundColor Yellow
@@ -169,8 +169,8 @@ Write-Host "     (repeat for identity-web, workspace-backend, workspace-web)" -F
 Write-Host ""
 Write-Host "  2. Seal your secrets with kubeseal (see sealed-secret.yaml files)" -ForegroundColor White
 Write-Host ""
-Write-Host "  3. Open ArgoCD UI:     http://argocd.local" -ForegroundColor White
-Write-Host "  4. Open Grafana:       http://grafana.local  (after monitoring sync)" -ForegroundColor White
-Write-Host "  5. Open Identity app:  http://identity.local" -ForegroundColor White
-Write-Host "  6. Open Workspace app: http://workspace.local" -ForegroundColor White
+Write-Host "  3. Open ArgoCD UI:     https://argocd.local" -ForegroundColor White
+Write-Host "  4. Open Grafana:       https://grafana.local  (after monitoring sync)" -ForegroundColor White
+Write-Host "  5. Open Identity app:  https://identity.local" -ForegroundColor White
+Write-Host "  6. Open Workspace app: https://workspace.local" -ForegroundColor White
 

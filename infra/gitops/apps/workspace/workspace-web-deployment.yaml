@@ -25,15 +25,15 @@ spec:
               name: http
           env:
             - name: VITE_API_URL
-              value: "http://workspace.local/api/v1/"
+              value: "https://workspace.local/api/v1/"
             - name: VITE_X_CLIENT_ID
               value: "PRODUCTION"
             - name: VITE_OAUTH_URL
-              value: "http://identity.local/oauth2/authorize"
+              value: "https://identity.local/oauth2/authorize"
             - name: VITE_CLIENT_ID
               value: "work_space_platform"
             - name: VITE_REDIRECT_URL
-              value: "http://workspace.local/auth/callback"
+              value: "https://workspace.local/auth/callback"
           resources:
             requests:
               cpu: 50m
