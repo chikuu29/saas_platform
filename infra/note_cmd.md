@@ -84,3 +84,63 @@ kubectl get all --all-namespaces
 
 
  kubectl exec -n identity deployment/identity-backend -- python3 -c "import json; d=json.load(open('/app/keys/keys.json')); print('active_kid:', d['active_kid']); print('stored kids:', list(d['keys'].keys()))"
+
+
+# ─── LOGGING COMMANDS ───────────────────────────────────────────────────────
+
+## View logs (last N lines)
+kubectl logs -l app=identity-backend  -n identity  --tail=50
+kubectl logs -l app=workspace-backend -n workspace --tail=50
+kubectl logs -l app=workspace-web     -n workspace --tail=50
+
+## Follow logs in real-time (Ctrl+C to stop)
+kubectl logs -l app=identity-backend  -n identity  -f
+kubectl logs -l app=workspace-backend -n workspace -f
+
+## Logs from last N minutes
+kubectl logs -l app=identity-backend  -n identity  --since=5m
+kubectl logs -l app=workspace-backend -n workspace --since=5m
+
+## Logs from a specific pod (not label selector)
+kubectl get pods -n identity                          # get pod name
+kubectl logs <pod-name> -n identity --tail=50
+
+## Check logs at startup only (useful for key_manager ✅/⚠️ messages)
+kubectl logs -l app=identity-backend -n identity --tail=100 | findstr "key_manager\|RSA\|kid"
+
+## Previous crashed container logs
+kubectl logs <pod-name> -n identity --previous
+
+# ─── RSA KEY CHECKS ─────────────────────────────────────────────────────────
+
+## Check keys.json exists on PVC
+kubectl exec -n identity deployment/identity-backend -- ls -la /app/keys/
+
+## Show active_kid in keys.json
+kubectl exec -n identity deployment/identity-backend -- python3 -c "import json; d=json.load(open('/app/keys/keys.json')); print('active_kid:', d['active_kid']); print('stored kids:', list(d['keys'].keys()))"
+
+## Check JWKS endpoint kid (must match active_kid above)
+kubectl exec -n identity deployment/identity-backend -- python3 -c "import urllib.request,json; r=urllib.request.urlopen('http://localhost:8000/.well-known/jwks.json'); [print('jwks kid:',k['kid']) for k in json.loads(r.read())['keys']]"
+
+# ─── TERMINAL ACCESS (exec into pod) ────────────────────────────────────────
+
+## Get a shell inside a running pod  (use /bin/sh — alpine images have no bash)
+kubectl exec -it -n identity  deployment/identity-backend  -- /bin/sh
+kubectl exec -it -n workspace deployment/workspace-backend -- /bin/sh
+kubectl exec -it -n workspace deployment/workspace-web     -- /bin/sh
+
+## Useful commands once inside:
+# cat /app/keys/keys.json          → check RSA keys
+# env | grep VITE_                 → check ConfigMap env vars (web pod)
+# env                              → all env vars
+# cat /etc/nginx/conf.d/*.conf     → nginx config (web pod)
+# exit                             → leave the shell
+
+
+
+
+
+
+
+
+kubectl exec -n workspace deployment/workspace-backend -- env | findstr "OAUTH_CLIENT"
