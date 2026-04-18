@@ -220,23 +220,29 @@ nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"   # Large JWT tokens
 
 Every file in `infra/gitops/` explained:
 
+> [!CAUTION]
+> **Data Persistence Warning**: When moving or renaming folders that contain `PersistentVolumeClaims` (like the `platform/` databases), ArgoCD will treat the old path as "deleted" and prune the existing PVCs. Because the default storage policy is `Delete`, this **will wipe your database data**. 
+> 
+> To prevent this, either set the `reclaimPolicy` to `Retain` on your PersistentVolumes or use the `argocd.argoproj.io/sync-options: Prune=false` annotation before refactoring.
+
 ```
 infra/gitops/
 │
 ├── bootstrap-local.ps1
 ├── argocd/
 │   ├── app-of-apps.yaml
-│   ├── app-infra.yaml
+│   ├── app-saas-platform-infra.yaml
 │   ├── app-identity.yaml
 │   ├── app-workspace.yaml
 │   └── app-monitoring.yaml
 │
-├── infra/
+├── platform/
 │   ├── kustomization.yaml
 │   ├── sealed-secrets-controller.yaml
+│   ├── namespaces/
+│   │   └── kustomization.yaml
 │   ├── identity-postgres/
 │   │   ├── kustomization.yaml
-│   │   ├── namespace.yaml
 │   │   ├── pvc.yaml
 │   │   ├── sealed-secret.yaml
 │   │   ├── statefulset.yaml
@@ -248,7 +254,6 @@ infra/gitops/
 │   │   └── service.yaml
 │   └── workspace-mongodb/
 │       ├── kustomization.yaml
-│       ├── namespace.yaml
 │       ├── pvc.yaml
 │       ├── sealed-secret.yaml
 │       ├── configmap-init.yaml
@@ -307,8 +312,8 @@ infra/gitops/
 
 ---
 
-### 📄 `argocd/app-infra.yaml`
-**What**: ArgoCD Application that watches `infra/gitops/infra/` and deploys all databases (PostgreSQL, Redis, MongoDB) and the Sealed Secrets controller.
+### 📄 `argocd/app-saas-platform-infra.yaml`
+**What**: ArgoCD Application that watches `infra/gitops/platform/` and deploys all databases (PostgreSQL, Redis, MongoDB) and the Sealed Secrets controller.
 **Sync Wave**: `0` — runs **before** apps start, because apps need databases to be ready.
 
 ---
@@ -336,8 +341,8 @@ infra/gitops/
 
 ---
 
-### 📄 `infra/kustomization.yaml`
-**What**: Kustomize aggregator — lists all resources in the `infra/` folder so ArgoCD knows what to apply. Applies Sealed Secrets controller first (it must exist before `SealedSecret` resources are decrypted).
+### 📄 `platform/kustomization.yaml`
+**What**: Kustomize aggregator — lists all resources in the `platform/` folder so ArgoCD knows what to apply. Applies Sealed Secrets controller first (it must exist before `SealedSecret` resources are decrypted).
 **Kustomize** is a Kubernetes-native way to manage YAML without Helm. No templating — just plain YAML with overlays and patches.
 
 ---
@@ -744,7 +749,7 @@ kubectl create secret generic identity-postgres-secret `
 kubeseal --controller-name=sealed-secrets-controller `
   --controller-namespace=kube-system `
   --format yaml < temp-postgres-secret.yaml > `
-  .\infra\gitops\infra\identity-postgres\sealed-secret.yaml
+  .\infra\gitops\platform\identity-db\postgres\sealed-secret.yaml
 
 # Delete the plain secret (NEVER commit temp-postgres-secret.yaml)
 Remove-Item temp-postgres-secret.yaml
@@ -762,7 +767,7 @@ kubectl create secret generic workspace-mongodb-secret `
 kubeseal --controller-name=sealed-secrets-controller `
   --controller-namespace=kube-system `
   --format yaml < temp-mongo-secret.yaml > `
-  .\infra\gitops\infra\workspace-mongodb\sealed-secret.yaml
+  .\infra\gitops\platform\workspace-db\sealed-secret.yaml
 
 Remove-Item temp-mongo-secret.yaml
 ```
@@ -780,7 +785,7 @@ kubectl create secret generic identity-app-secret `
 kubeseal --controller-name=sealed-secrets-controller `
   --controller-namespace=kube-system `
   --format yaml < temp-identity-app.yaml > `
-  .\infra\gitops\infra\identity-app-secret.yaml
+  .\infra\gitops\platform\identity-db\identity-app-secret.yaml
 
 Remove-Item temp-identity-app.yaml
 ```
@@ -798,7 +803,7 @@ kubectl create secret docker-registry dockerhub-secret `
 kubeseal --controller-name=sealed-secrets-controller `
   --controller-namespace=kube-system `
   --format yaml < temp-dockerhub.yaml > `
-  .\infra\gitops\infra\dockerhub-secret-identity.yaml
+  .\infra\gitops\platform\identity-db\dockerhub-secret-identity.yaml
 
 Remove-Item temp-dockerhub.yaml
 # Repeat for workspace namespace
@@ -819,7 +824,7 @@ git push
 
 **Step 7 — Commit and push sealed secrets:**
 ```powershell
-git add infra/gitops/infra/
+git add infra/gitops/platform/
 git commit -m "secrets: add sealed secrets for all services"
 git push
 # ArgoCD detects the change and applies the SealedSecrets → pods restart with credentials

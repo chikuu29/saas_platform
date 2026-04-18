@@ -6,7 +6,7 @@ name: Build Workspace Platform
 on:
   workflow_dispatch:
   push:
-    branches: [dev]
+    branches: [master]
     paths:
       - 'apps/work_space/**'
       - '.github/workflows/build-workspace.yml'
@@ -14,9 +14,6 @@ on:
 env:
   REGISTRY: docker.io
   DOCKERHUB_USERNAME: cchiku1999
-  # dev branch → "dev" tag, master → "latest" tag
-  IMAGE_TAG: ${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
-  GITOPS_BRANCH: ${{ github.ref_name }}
 
 jobs:
   build-and-push:
@@ -45,10 +42,9 @@ jobs:
         with:
           context: apps/work_space/backend
           push: true
-          # SHA tag (immutable) + branch tag: "latest" on master, "dev" on dev
           tags: |
             ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-backend:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-backend:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -59,7 +55,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-web:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-web:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/saas-workspace-web:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -76,7 +72,8 @@ jobs:
           git config user.name "GitHub Actions [Workspace CI]"
           git config user.email "ci@users.noreply.github.com"
           git add infra/gitops/apps/workspace/
-          git diff --staged --quiet || git commit -m "ci(workspace): update image tags to ${{ github.sha }} [${{ env.GITOPS_BRANCH }}]"
-          # Push back to the same branch that triggered this workflow (master or dev)
-          git pull --rebase origin ${{ env.GITOPS_BRANCH }}
-          git push origin HEAD:${{ env.GITOPS_BRANCH }}
+          git diff --staged --quiet || git commit -m "ci(workspace): update image tags to ${{ github.sha }}"
+          # Pull latest remote commits first to avoid race condition when
+          # both identity and workspace pipelines push at the same time.
+          git pull --rebase origin master
+          git push

@@ -86,28 +86,21 @@ infra/gitops/
 │
 ├── argocd/                          ← Layer 1: ArgoCD apps (the deployment brain)
 │   ├── app-of-apps.yaml             ← ROOT: bootstraps everything
-│   ├── app-infra.yaml               ← Manages: databases + secrets
+│   ├── app-saas-platform-infra.yaml ← Manages: platform namespaces + databases + secrets
 │   ├── app-identity.yaml            ← Manages: identity service
 │   ├── app-workspace.yaml           ← Manages: workspace service
 │   ├── app-monitoring.yaml          ← Manages: Prometheus + Grafana
 │   ├── nginx-ingress.yaml           ← Manages: NGINX traffic router
 │   └── argocd-ingress.yaml          ← Makes ArgoCD UI accessible
 │
-├── infra/                           ← Layer 2: Databases & infrastructure
+├── platform/                        ← Layer 2: Platform Infrastructure
 │   ├── kustomization.yaml           ← Tells kustomize which files to include
 │   ├── sealed-secrets-controller.yaml ← The secret decryption engine
-│   ├── identity-postgres/           ← PostgreSQL for identity service
-│   │   ├── kustomization.yaml
-│   │   ├── namespace.yaml           ← Creates the 'identity' namespace
-│   │   ├── pvc.yaml                 ← Reserves disk space for data
-│   │   ├── sealed-secret.yaml       ← Encrypted DB credentials
-│   │   ├── identity-app-secret.yaml ← Encrypted SMTP, Razorpay keys
-│   │   ├── statefulset.yaml         ← Runs the PostgreSQL pod
-│   │   └── service.yaml             ← Internal DNS: identity-postgres:5432
-│   ├── identity-redis/              ← Redis for sessions/caching
-│   │   └── (same pattern)
-│   └── workspace-mongodb/           ← MongoDB for workspace service
-│       └── (same pattern)
+│   ├── namespaces/                  ← Common platform namespaces
+│   ├── identity-db/                 ← DBs for identity service
+│   │   ├── postgres/                ← PostgreSQL StatefulSet & PVC
+│   │   └── redis/                   ← Redis StatefulSet & PVC
+│   └── workspace-db/                ← MongoDB for workspace service
 │
 ├── apps/                            ← Layer 3: Application services
 │   ├── identity/
@@ -197,14 +190,14 @@ spec:
 
 ---
 
-### `argocd/app-infra.yaml` — Databases (Sync Wave 0)
+### `argocd/app-saas-platform-infra.yaml` — Databases (Sync Wave 0)
 
 Deploys all databases. Must run before apps because apps need databases ready to start.
 
 ```yaml
 spec:
   source:
-    path: infra/gitops/infra          # ← Watches the infra/ folder
+    path: infra/gitops/platform          # ← Watches the platform/ folder
 ```
 
 ---
@@ -593,7 +586,7 @@ Sealed Secrets Controller (decrypts using cluster's PRIVATE KEY)
 Regular Kubernetes Secret (available to pods as env vars)
 ```
 
-### `infra/sealed-secrets-controller.yaml` — The Decryption Engine
+### `platform/sealed-secrets-controller.yaml` — The Decryption Engine
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -614,7 +607,7 @@ kubectl get secret -n kube-system -l sealedsecrets.bitnami.com/sealed-secrets-ke
 
 ---
 
-### `infra/identity-postgres/sealed-secret.yaml` — An Encrypted Secret
+### `platform/identity-db/postgres/sealed-secret.yaml` — An Encrypted Secret
 
 The file looks like this in Git:
 ```yaml
@@ -719,16 +712,16 @@ The `hosts` file tells your computer: "when you see `identity.local`, use `127.0
 Kustomize reads `kustomization.yaml` and combines all listed files into one big
 YAML document before applying to Kubernetes.
 
-### Example: `infra/gitops/infra/kustomization.yaml`
+### Example: `infra/gitops/platform/kustomization.yaml`
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - sealed-secrets-controller.yaml   # ← Include this file
-  - identity-postgres/               # ← Include entire directory (reads its kustomization.yaml)
-  - identity-redis/
-  - workspace-mongodb/
+  - namespaces/                      # ← Namespaces first
+  - identity-db/                     # ← Databases second
+  - workspace-db/
 ```
 
 **Without kustomize:** You'd need to `kubectl apply -f file1.yaml -f file2.yaml -f ...`
@@ -754,7 +747,7 @@ Kubernetes resources get applied in wave order. Lower wave number = applied firs
 Wave -1:  nginx-ingress      ← Traffic router must exist first
           sealed-secrets     ← Secret decryption must exist before secrets are created
 
-Wave  0:  app-infra          ← Databases start (needs secrets controller from wave -1)
+Wave  0:  app-saas-platform-infra  ← Databases start (needs secrets controller from wave -1)
 
 Wave  1:  app-identity       ← Identity service (needs DB from wave 0)
           app-workspace      ← Workspace service (needs DB and identity from wave 0)
@@ -774,6 +767,9 @@ metadata:
 **Why this matters:** If you start the identity service before the database is ready,
 the pod crashes on startup. Waves enforce ordering.
 
+> [!WARNING]
+> **Refactoring & Sync Waves**: If you change the folder structure (e.g., renaming `infra/` to `platform/`), ArgoCD will prune the old resources before creating the new ones. If these resources are PVCs, your data will be deleted. Always backup your databases before performing structural GitOps changes.
+
 ---
 
 ## 12. Full File Reference
@@ -783,21 +779,21 @@ the pod crashes on startup. Waves enforce ordering.
 | File | Kind | Job |
 |---|---|---|
 | `argocd/app-of-apps.yaml` | `Application` | Root — watches `argocd/` folder, creates all child apps |
-| `argocd/app-infra.yaml` | `Application` | Points ArgoCD at `infra/gitops/infra/` |
+| `argocd/app-saas-platform-infra.yaml` | `Application` | Points ArgoCD at `infra/gitops/platform/` |
 | `argocd/app-identity.yaml` | `Application` | Points ArgoCD at `infra/gitops/apps/identity/` |
 | `argocd/app-workspace.yaml` | `Application` | Points ArgoCD at `infra/gitops/apps/workspace/` |
 | `argocd/app-monitoring.yaml` | `Application` | Points ArgoCD at `infra/gitops/monitoring/` |
 | `argocd/nginx-ingress.yaml` | `Application` | Installs NGINX via Helm |
 | `argocd/argocd-ingress.yaml` | `Ingress` | `argocd.local` → ArgoCD UI |
-| `infra/sealed-secrets-controller.yaml` | `Application` | Installs Sealed Secrets via Helm |
-| `infra/identity-postgres/namespace.yaml` | `Namespace` | Creates `identity` namespace |
-| `infra/identity-postgres/pvc.yaml` | `PVC` | Reserves 5GB disk for PostgreSQL |
-| `infra/identity-postgres/sealed-secret.yaml` | `SealedSecret` | Encrypted DB credentials |
-| `infra/identity-postgres/identity-app-secret.yaml` | `SealedSecret` | Encrypted SMTP, Razorpay keys |
-| `infra/identity-postgres/statefulset.yaml` | `StatefulSet` | Runs PostgreSQL pod |
-| `infra/identity-postgres/service.yaml` | `Service` | DNS: `identity-postgres:5432` |
-| `infra/identity-redis/...` | | Same pattern for Redis |
-| `infra/workspace-mongodb/sealed-secret.yaml` | `SealedSecret` | Encrypted MongoDB password |
+| `platform/sealed-secrets-controller.yaml` | `Application` | Installs Sealed Secrets via Helm |
+| `platform/namespaces/...` | `Namespace` | Creates core namespaces (`identity`, `workspace`, etc.) |
+| `platform/identity-db/postgres/pvc.yaml` | `PVC` | Reserves 5GB disk for PostgreSQL |
+| `platform/identity-db/postgres/sealed-secret.yaml` | `SealedSecret` | Encrypted DB credentials |
+| `platform/identity-db/identity-app-secret.yaml` | `SealedSecret` | Encrypted SMTP, Razorpay keys |
+| `platform/identity-db/postgres/statefulset.yaml` | `StatefulSet` | Runs PostgreSQL pod |
+| `platform/identity-db/postgres/service.yaml` | `Service` | DNS: `identity-postgres:5432` |
+| `platform/identity-db/redis/...` | | Same pattern for Redis |
+| `platform/workspace-db/sealed-secret.yaml` | `SealedSecret` | Encrypted MongoDB password |
 | `infra/workspace-mongodb/workspace-app-secret.yaml` | `SealedSecret` | Encrypted SECRET_KEY, OAuth |
 | `infra/workspace-mongodb/statefulset.yaml` | `StatefulSet` | Runs MongoDB pod |
 | `apps/identity/configmap.yaml` | `ConfigMap` | Non-secret env: REDIS_URL, DOMAIN_NAME |
@@ -839,7 +835,7 @@ When you run `bootstrap-local.ps1` for the first time, here is the exact order:
 5. Wave -1 runs: nginx-ingress installs NGINX via Helm
                  sealed-secrets installs controller via Helm
 
-6. Wave 0 runs: app-infra reads infra/gitops/infra/
+6. Wave 0 runs: saas-platform-infra reads infra/gitops/platform/
    ├─ Creates namespace: identity, workspace
    ├─ Creates PVCs: reserves disk space
    ├─ Applies SealedSecrets → controller decrypts → creates Secrets
@@ -1616,12 +1612,12 @@ kubectl describe sealedsecret identity-postgres-secret -n identity
 argocd app list --server argocd.local --insecure --grpc-web
 
 # ── Get detail on one app ─────────────────────────────────────────────────────
-argocd app get app-infra --server argocd.local --insecure --grpc-web
+argocd app get saas-platform-infra --server argocd.local --insecure --grpc-web
 
 # ── Manually sync an app (pull latest Git changes NOW) ───────────────────────
 argocd app sync app-identity --server argocd.local --insecure --grpc-web
 argocd app sync app-monitoring --server argocd.local --insecure --grpc-web
-argocd app sync app-infra --server argocd.local --insecure --grpc-web
+argocd app sync saas-platform-infra --server argocd.local --insecure --grpc-web
 
 # ── Force a hard refresh (re-reads Git, ignores cache) ───────────────────────
 kubectl annotate app app-monitoring -n argocd argocd.argoproj.io/refresh=hard --overwrite

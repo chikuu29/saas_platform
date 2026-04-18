@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Namespace declarations for all platform namespaces.
+# Owned by saas-platform-infra (wave 0) — feature apps (app-identity, app-workspace)
+# must NOT re-declare these. Decoupled here so no single component's deletion
+# can accidentally cascade and destroy an entire namespace.
+resources:
+  - namespace-identity.yaml
+  - namespace-workspace.yaml

@@ -20,11 +20,10 @@ spec:
     targetRevision: HEAD
     # Path inside the monorepo where child app manifests live.
     # ArgoCD picks up ALL Application CRDs in this directory:
-    #   nginx-ingress.yaml   (wave -1) — NGINX Ingress Controller via Helm
-    #   sealed-secrets in app-infra (wave 0) — secret decryption
-    #   app-infra.yaml       (wave 0) — PostgreSQL, Redis, MongoDB
-    #   app-identity.yaml    (wave 1) — identity-backend + identity-web
-    #   app-workspace.yaml   (wave 1) — workspace-backend + workspace-web
+    #   nginx-ingress.yaml                (wave -1) — NGINX Ingress Controller via Helm
+    #   app-saas-platform-infra.yaml      (wave  0) — Namespaces, Sealed Secrets, DBs
+    #   app-identity.yaml                 (wave  1) — identity-backend + identity-web
+    #   app-workspace.yaml                (wave  1) — workspace-backend + workspace-web
     #   app-monitoring.yaml  (wave 2) — Prometheus + Grafana + Loki
     path: infra/gitops/argocd
   destination:

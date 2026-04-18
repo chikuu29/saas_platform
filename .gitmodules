@@ -1,19 +1,15 @@
 [submodule "apps/identity_server/backend"]
 	path = apps/identity_server/backend
 	url = https://github.com/chikuu29/OWN_OAUTH_INDENTITY_PROVIDER_BACKEND.git
-	branch = dev
 
 [submodule "apps/identity_server/web"]
 	path = apps/identity_server/web
 	url = https://github.com/chikuu29/OWN_OAUTH_INDENTITY_PROVIDER_FRONTEND.git
-	branch = dev
 
 [submodule "apps/work_space/backend"]
 	path = apps/work_space/backend
 	url = https://github.com/chikuu29/workspace-platform-fastapi.git
-	branch = dev
 
 [submodule "apps/work_space/web"]
 	path = apps/work_space/web
 	url = https://github.com/chikuu29/workspace-platform.git
-	branch = dev

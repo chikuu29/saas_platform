@@ -1,0 +1,18 @@
+# Namespace: workspace
+#
+# Owned EXCLUSIVELY by saas-platform-infra (wave 0).
+# Decoupled from workspace-db/ so removing or pruning the database tier
+# never accidentally cascades destruction to this namespace and kills
+# workspace-backend / workspace-web pods.
+#
+# Feature apps (app-workspace) must NOT redeclare this namespace.
+# They use CreateNamespace=true only as an emergency fallback.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workspace
+  labels:
+    # Platform-wide label — used by monitoring selectors and NetworkPolicies.
+    app.kubernetes.io/part-of: saas-platform
+    # Explicit ownership — ArgoCD resolves tracking-id conflicts using this label.
+    argocd.argoproj.io/managed-by: saas-platform-infra

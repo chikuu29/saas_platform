@@ -1,7 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+# Namespace "identity" is owned by saas-platform-infra (wave 0) via platform/namespaces/.
+# app-identity must NOT re-declare it — doing so causes ArgoCD tracking-id conflicts.
+# CreateNamespace=true in app-identity.yaml handles the fallback safely.
 resources:
-  - namespace.yaml
   - configmap.yaml
   - identity-backend-deployment.yaml
   - identity-keys-pvc.yaml
@@ -9,4 +12,3 @@ resources:
   - identity-backend-hpa.yaml
   - identity-web-deployment.yaml
   - ingress.yaml
-

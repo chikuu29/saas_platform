@@ -1,12 +1,17 @@
-# ArgoCD Application — Infrastructure Layer (wave 0)
+# ArgoCD Application — SaaS Platform Infrastructure (wave 0)
 #
-# Deploys all stateful data stores: PostgreSQL, Redis, MongoDB.
-# Must sync BEFORE apps (wave 1) since backends depend on the databases.
-# Sealed Secrets controller is also in this wave so secrets decrypt before pods start.
+# Deploys all foundational platform resources:
+#   - Namespaces (identity, workspace) — decoupled from any component lifecycle
+#   - Controllers (Sealed Secrets, Ingress TLS cert)
+#   - Identity database tier (PostgreSQL + Redis)
+#   - Workspace database tier (MongoDB)
+#
+# Must sync BEFORE apps (wave 1) since backends depend on the databases
+# and namespaces must exist before any workload deploys into them.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app-infra
+  name: saas-platform-infra
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
@@ -17,10 +22,11 @@ spec:
   source:
     repoURL: https://github.com/chikuu29/saas_platform.git
     targetRevision: HEAD
-    path: infra/gitops/infra
+    path: infra/gitops/platform
   destination:
     server: https://kubernetes.default.svc
-    namespace: infra   # Resources themselves specify their own namespaces
+    # Resources specify their own namespaces (identity, workspace, kube-system)
+    namespace: default
   syncPolicy:
     automated:
       prune: true
