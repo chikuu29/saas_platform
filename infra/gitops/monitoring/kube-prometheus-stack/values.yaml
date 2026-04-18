@@ -8,17 +8,10 @@ grafana:
   # Inline password for local dev — change for production via SealedSecret
   adminPassword: "admin"
 
-  # Expose via Traefik ingress at grafana.local
+  # Ingress is managed by standalone grafana-ingress.yaml (has custom annotations)
+  # Disabled here to avoid NGINX webhook duplicate host+path conflict
   ingress:
-    enabled: true
-    ingressClassName: nginx
-    hosts:
-      - grafana.local
-    tls:
-      - hosts:
-          - grafana.local
-    path: /
-    pathType: Prefix
+    enabled: false
 
   # Grafana resource allocation — modest for local dev, enough for real use
   resources:
@@ -60,17 +53,9 @@ grafana:
 prometheus:
   enabled: true
 
+  # Ingress is managed by standalone prometheus-ingress.yaml
   ingress:
-    enabled: true
-    ingressClassName: nginx
-    hosts:
-      - prometheus.local
-    tls:
-      - hosts:
-          - prometheus.local
-    paths:
-      - /
-    pathType: Prefix
+    enabled: false
 
   prometheusSpec:
     # Retain 15 days of metrics data
@@ -142,17 +127,9 @@ prometheus:
 alertmanager:
   enabled: true
 
+  # Ingress is managed by standalone alertmanager-ingress.yaml
   ingress:
-    enabled: true
-    ingressClassName: nginx
-    hosts:
-      - alertmanager.local
-    tls:
-      - hosts:
-          - alertmanager.local
-    paths:
-      - /
-    pathType: Prefix
+    enabled: false
 
   alertmanagerSpec:
     storage:
