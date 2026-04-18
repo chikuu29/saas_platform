@@ -1,0 +1,17 @@
+# .gitattributes — Merge strategy overrides
+#
+# WHY: .github/workflows/ files differ intentionally between branches.
+#   master branch: triggers on [master], pushes manifests to master
+#   dev branch:    triggers on [dev],    pushes manifests to dev
+#
+# Without this, merging dev → master overwrites master's workflow config
+# with dev's version, causing CI to break (wrong branch triggers).
+#
+# merge=ours means: when merging ANY branch into master, always keep
+# master's own version of these files — never take the incoming changes.
+#
+# NOTE: Each developer must run once locally:
+#   git config merge.ours.driver true
+# Or add to repo-level: git config -f .git/config merge.ours.driver true
+
+.github/workflows/**  merge=ours
