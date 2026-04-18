@@ -40,12 +40,16 @@ grafana:
       enabled: true
 
   # Pre-configure Loki datasource alongside Prometheus
+  # Service name = <releaseName> from loki-stack helmchart.yaml
+  # Using FQDN for reliable DNS resolution across namespaces
   additionalDataSources:
     - name: Loki
       type: loki
-      url: http://loki-stack:3100
+      url: http://loki-stack.monitoring.svc.cluster.local:3100
       access: proxy
       isDefault: false
+      jsonData:
+        maxLines: 1000
 
   persistence:
     enabled: true

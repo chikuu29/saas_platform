@@ -1,7 +1,9 @@
 # kube-prometheus-stack — managed by ArgoCD via Helm.
 # Includes: Prometheus, Grafana, Alertmanager, kube-state-metrics, node-exporter.
 #
-# This is an ArgoCD Application (not a Kustomize resource) that uses Helm.
+# Uses multi-source so ArgoCD pulls the chart from upstream Helm registry
+# while reading values.yaml from our Git repo. This ensures Git changes
+# to values.yaml are detected and synced automatically.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,16 +13,21 @@ metadata:
     argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
-  source:
-    chart: kube-prometheus-stack
-    repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: 67.9.0
-    helm:
-      releaseName: kube-prometheus-stack
-      valueFiles:
-        - values.yaml
-      # Values file is loaded from the same path in the Git repo
-      # ArgoCD resolves this relative to the application's source path
+  sources:
+    # Source 1: Helm chart from upstream registry
+    - chart: kube-prometheus-stack
+      repoURL: https://prometheus-community.github.io/helm-charts
+      targetRevision: 67.9.0
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          # $values references our Git repo (Source 2) — ArgoCD resolves
+          # this path relative to the Git repo root
+          - $values/infra/gitops/monitoring/kube-prometheus-stack/values.yaml
+    # Source 2: Git repo providing the values file
+    - repoURL: https://github.com/chikuu29/saas_platform.git
+      targetRevision: HEAD
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
@@ -31,5 +38,3 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      # CRDs need replace strategy on first install
-      - Replace=false
