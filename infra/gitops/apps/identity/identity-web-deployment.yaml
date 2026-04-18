@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: identity-web
-          image: docker.io/cchiku1999/saas-identity-web:6d7619eebf1addce960733592ce46fdeb510e8c0
+          image: docker.io/cchiku1999/saas-identity-web:23fcbaa8eafa8a0fdbe236de0ecdd934f22119f3
           imagePullPolicy: Always
           ports:
             - containerPort: 80
