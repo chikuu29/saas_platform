@@ -3,11 +3,12 @@
 
 loki:
   enabled: true
-  # Override image — chart default (2.6.1) doesn't support Grafana 11.x
-  # health check query (vector() function requires Loki 3.x)
+  # Override image — chart default (2.6.1) is incompatible with Grafana 11.x
+  # health check. Using 2.9.10 (latest 2.x) — compatible with both the
+  # loki-stack chart config format AND Grafana 11.x vector() function.
   image:
     repository: grafana/loki
-    tag: 3.1.0
+    tag: 2.9.10
   persistence:
     enabled: true
     storageClassName: local-path
