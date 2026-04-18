@@ -1,9 +1,9 @@
-# kube-prometheus-stack — Prometheus, Grafana, Alertmanager, kube-state-metrics, node-exporter.
+# Prometheus Stack — Prometheus, Grafana, Alertmanager, kube-state-metrics, node-exporter.
 # Multi-source: chart from upstream Helm registry, values from this Git repo.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kube-prometheus-stack
+  name: prometheus-stack
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2"
