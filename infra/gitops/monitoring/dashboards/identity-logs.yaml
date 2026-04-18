@@ -1,5 +1,6 @@
-# Identity Backend Logs Dashboard — auto-provisioned via ConfigMap sidecar.
+# Backend Logs Dashboard — auto-provisioned via ConfigMap sidecar.
 # Visualizes log levels (ERROR, WARNING, INFO, DEBUG) using Loki datasource.
+# Supports both identity-backend and workspace-backend via dropdown filter.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,11 +11,11 @@ metadata:
 data:
   identity-logs.json: |
     {
-      "title": "Identity Server — Logs",
-      "uid": "identity-server-logs",
+      "title": "SaaS Platform — Backend Logs",
+      "uid": "saas-backend-logs",
       "schemaVersion": 38,
-      "version": 1,
-      "tags": ["saas", "identity", "logs", "loki"],
+      "version": 2,
+      "tags": ["saas", "logs", "loki", "identity", "workspace"],
       "time": { "from": "now-1h", "to": "now" },
       "refresh": "10s",
       "timezone": "browser",
@@ -23,15 +24,28 @@ data:
       "templating": {
         "list": [
           {
-            "name": "pod",
-            "label": "Pod",
-            "type": "query",
-            "datasource": { "type": "loki", "uid": "" },
-            "query": "{namespace=\"identity\", app=\"identity-backend\"} | label_values pod",
-            "refresh": 2,
-            "includeAll": true,
-            "multi": true,
-            "current": { "text": "All", "value": "$__all" }
+            "name": "service",
+            "label": "Service",
+            "type": "custom",
+            "current": { "text": "identity-backend", "value": "identity-backend" },
+            "options": [
+              { "text": "identity-backend", "value": "identity-backend", "selected": true },
+              { "text": "workspace-backend", "value": "workspace-backend", "selected": false }
+            ],
+            "includeAll": false,
+            "multi": false
+          },
+          {
+            "name": "namespace",
+            "label": "Namespace",
+            "type": "custom",
+            "current": { "text": "identity", "value": "identity" },
+            "options": [
+              { "text": "identity", "value": "identity", "selected": true },
+              { "text": "workspace", "value": "workspace", "selected": false }
+            ],
+            "includeAll": false,
+            "multi": false
           }
         ]
       },
@@ -39,13 +53,13 @@ data:
 
         {
           "id": 1,
-          "title": "🔴 Error Log Count (1m rate)",
+          "title": "🔴 Errors / min",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
           "datasource": { "type": "loki", "uid": "" },
           "targets": [{
-            "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)(ERROR|error|Error)\" [1m]))",
-            "legendFormat": "Errors/min"
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(ERROR|error)\" [1m]))",
+            "legendFormat": "Errors"
           }],
           "options": {
             "reduceOptions": { "calcs": ["lastNotNull"] },
@@ -66,13 +80,13 @@ data:
 
         {
           "id": 2,
-          "title": "⚠️ Warning Log Count (1m rate)",
+          "title": "⚠️ Warnings / min",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
           "datasource": { "type": "loki", "uid": "" },
           "targets": [{
-            "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)(WARNING|WARN|warning|warn)\" [1m]))",
-            "legendFormat": "Warnings/min"
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(WARNING|WARN)\" [1m]))",
+            "legendFormat": "Warnings"
           }],
           "options": {
             "reduceOptions": { "calcs": ["lastNotNull"] },
@@ -93,13 +107,13 @@ data:
 
         {
           "id": 3,
-          "title": "ℹ️ Info Log Count (1m rate)",
+          "title": "ℹ️ Info / min",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
           "datasource": { "type": "loki", "uid": "" },
           "targets": [{
-            "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)(INFO|info)\" [1m]))",
-            "legendFormat": "Info/min"
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)INFO\" [1m]))",
+            "legendFormat": "Info"
           }],
           "options": {
             "reduceOptions": { "calcs": ["lastNotNull"] },
@@ -116,13 +130,13 @@ data:
 
         {
           "id": 4,
-          "title": "🐛 Debug Log Count (1m rate)",
+          "title": "🐛 Debug / min",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
           "datasource": { "type": "loki", "uid": "" },
           "targets": [{
-            "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)(DEBUG|debug)\" [1m]))",
-            "legendFormat": "Debug/min"
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)DEBUG\" [1m]))",
+            "legendFormat": "Debug"
           }],
           "options": {
             "reduceOptions": { "calcs": ["lastNotNull"] },
@@ -140,25 +154,25 @@ data:
         {
           "id": 10,
           "title": "📊 Log Volume by Level",
-          "description": "Log line count over time, grouped by log level",
+          "description": "Log line count over time grouped by level",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
           "datasource": { "type": "loki", "uid": "" },
           "targets": [
             {
-              "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)error\" [1m]))",
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)error\" [1m]))",
               "legendFormat": "ERROR"
             },
             {
-              "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)(warning|warn)\" [1m]))",
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(warning|warn)\" [1m]))",
               "legendFormat": "WARNING"
             },
             {
-              "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)info\" [1m]))",
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)info\" [1m]))",
               "legendFormat": "INFO"
             },
             {
-              "expr": "sum(count_over_time({namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)debug\" [1m]))",
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)debug\" [1m]))",
               "legendFormat": "DEBUG"
             }
           ],
@@ -187,7 +201,7 @@ data:
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
           "datasource": { "type": "loki", "uid": "" },
           "targets": [{
-            "expr": "{namespace=\"identity\", app=\"identity-backend\"} |~ \"(?i)(ERROR|error|Error|Traceback|exception|Exception)\"",
+            "expr": "{namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(ERROR|Traceback|exception|Exception)\"",
             "maxLines": 200
           }],
           "options": {
@@ -204,13 +218,13 @@ data:
 
         {
           "id": 30,
-          "title": "📋 All Logs — Identity Backend",
-          "description": "Full log stream with all levels",
+          "title": "📋 All Logs",
+          "description": "Full log stream — use the Service dropdown to switch between backends",
           "type": "logs",
           "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
           "datasource": { "type": "loki", "uid": "" },
           "targets": [{
-            "expr": "{namespace=\"identity\", app=\"identity-backend\"}",
+            "expr": "{namespace=\"$namespace\", app=\"$service\"}",
             "maxLines": 500
           }],
           "options": {
