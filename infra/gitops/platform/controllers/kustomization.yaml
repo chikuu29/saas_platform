@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Cluster-scoped controllers that must exist before any workload secrets are decrypted.
+#
+# sealed-secrets-controller — decrypts SealedSecret CRDs into Kubernetes Secrets.
+#   Must be applied before identity-db/ and workspace-db/ StatefulSets start,
+#   because they depend on decrypted credentials.
+#
+# ingress-nginx-tls-sealed — TLS certificate SealedSecret for the NGINX Ingress Controller.
+#   Applied here so TLS is ready before any Ingress resource references it.
+resources:
+  - sealed-secrets-controller.yaml
+  - ingress-nginx-tls-sealed.yaml
