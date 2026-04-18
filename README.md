@@ -82,7 +82,8 @@ saas_platform/
 │   │   ├── apps/
 │   │   │   ├── identity/     # Identity server K8s app manifests
 │   │   │   └── workspace/    # Workspace K8s app manifests
-│   │   └── infra/            # Cluster infra (sealed-secrets, monitoring, etc.)
+│   │   └── platform/         # Root platform infra (namespaces, databases, controllers)
+│   │   └── monitoring/       # Observability stack (Prometheus, Grafana, Loki)
 │   ├── sealed-secrets-guide.md   # How to create and manage secrets
 │   └── note_cmd.md               # Quick command reference
 │

@@ -112,12 +112,16 @@ apps/
     `-- web/       # React multi-org/multi-app frontend
 
 infra/
-`-- dev/
-    |-- docker-compose.dev.yml
-    |-- docker-compose.data.yml
-    |-- docker-compose.identity-server.yml
-    |-- docker-compose.workspace.yml
-    `-- init-mongo.js
+`-- gitops/
+    |-- platform/  # Root platform infra (namespaces, DBs, controllers)
+    |-- apps/      # Identity and Workspace apps
+    `-- monitoring/ # Observability stack
+dev/
+|-- docker-compose.dev.yml
+|-- docker-compose.data.yml
+|-- docker-compose.identity-server.yml
+|-- docker-compose.workspace.yml
+`-- init-mongo.js
 
 docker-data/
 `-- persistent local service data
@@ -472,7 +476,7 @@ This separation is a strong architectural choice because it keeps identity and p
 
 ## 9. Local Development / Deployment Topology
 
-The repo includes a combined Docker Compose setup in `infra/dev/docker-compose.dev.yml`.
+The repo includes a combined Docker Compose setup in `infra/dev/docker-compose.dev.yml` for local container-only development, and a full GitOps setup under `infra/gitops/` for Kubernetes-based deployment.
 
 ### Main Services
 
@@ -633,6 +637,9 @@ flowchart TB
 - `apps/identity_server/web`
 - `apps/work_space/backend`
 - `apps/work_space/web`
+- `infra/gitops/platform`
+- `infra/gitops/apps`
+- `infra/gitops/monitoring`
 - `infra/dev/docker-compose.dev.yml`
 - `start-dev.ps1`
 - `start-docker-dev.ps1`
