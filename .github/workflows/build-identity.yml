@@ -7,7 +7,7 @@ name: Build Identity Server
 on:
   workflow_dispatch:
   push:
-    branches: [master, dev]
+    branches: [dev]
     paths:
       - 'apps/identity_server/**'
       - '.github/workflows/build-identity.yml'
