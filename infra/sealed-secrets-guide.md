@@ -36,7 +36,7 @@ The private key never leaves `kube-system`. Encrypted YAML is safe to store in G
 The controller is already deployed at:
 
 ```
-infra/gitops/infra/sealed-secrets-controller.yaml
+infra/gitops/platform/sealed-secrets-controller.yaml
 ```
 
 | Detail               | Value                       |
@@ -108,7 +108,7 @@ kubeseal --controller-namespace kube-system `
   --controller-name sealed-secrets-controller `
   --format yaml `
   -f temp-secret.yaml `
-  -w infra\gitops\apps\<folder>\<secret-name>.yaml
+  -w infra\gitops\platform\identity-db\postgres\<secret-name>.yaml
 ```
 
 **CMD**
@@ -117,7 +117,7 @@ kubeseal --controller-namespace kube-system ^
   --controller-name sealed-secrets-controller ^
   --format yaml ^
   -f temp-secret.yaml ^
-  -w infra\gitops\apps\<folder>\<secret-name>.yaml
+  -w infra\gitops\platform\identity-db\postgres\<secret-name>.yaml
 ```
 
 **Linux / macOS**
@@ -126,7 +126,7 @@ kubeseal --controller-namespace kube-system \
   --controller-name sealed-secrets-controller \
   --format yaml \
   -f temp-secret.yaml \
-  -w infra/gitops/apps/<folder>/<secret-name>.yaml
+  -w infra/gitops/platform/identity-db/postgres/<secret-name>.yaml
 ```
 
 The output file is encrypted — safe to commit to Git.
@@ -174,7 +174,7 @@ kubeseal --controller-namespace kube-system `
   --controller-name sealed-secrets-controller `
   --format yaml `
   -f temp-secret.yaml `
-  --merge-into infra\gitops\apps\<folder>\<secret-name>.yaml
+  --merge-into infra\gitops\platform\identity-db\postgres\<secret-name>.yaml
 
 # Step 3: Cleanup
 Remove-Item temp-secret.yaml
@@ -190,7 +190,7 @@ kubeseal --controller-namespace kube-system ^
   --controller-name sealed-secrets-controller ^
   --format yaml ^
   -f temp-secret.yaml ^
-  --merge-into infra\gitops\apps\<folder>\<secret-name>.yaml && ^
+  --merge-into infra\gitops\platform\identity-db\postgres\<secret-name>.yaml && ^
 del temp-secret.yaml
 ```
 
@@ -204,7 +204,7 @@ kubectl create secret generic <secret-name> \
   --controller-namespace kube-system \
   --controller-name sealed-secrets-controller \
   --format yaml \
-  --merge-into infra/gitops/apps/<folder>/<secret-name>.yaml
+  --merge-into infra/gitops/platform/identity-db/postgres/<secret-name>.yaml
 ```
 
 ---
@@ -248,7 +248,7 @@ echo -n "new-value-here" | kubeseal --raw \
 ### Step 4 — Register in kustomization.yaml
 
 ```yaml
-# infra/gitops/apps/<folder>/kustomization.yaml
+# infra/gitops/platform/identity-db/postgres/kustomization.yaml
 resources:
   - <secret-name>.yaml   # ← add this line
 ```
@@ -270,16 +270,16 @@ envFrom:
 
 **PowerShell / CMD**
 ```powershell
-git add infra/gitops/apps/<folder>/<secret-name>.yaml
-git add infra/gitops/apps/<folder>/kustomization.yaml
+git add infra/gitops/platform/identity-db/postgres/<secret-name>.yaml
+git add infra/gitops/platform/identity-db/postgres/kustomization.yaml
 git commit -m "feat: add <secret-name> sealed secret"
 git push
 ```
 
 **Linux / macOS**
 ```bash
-git add infra/gitops/apps/<folder>/<secret-name>.yaml
-git add infra/gitops/apps/<folder>/kustomization.yaml
+git add infra/gitops/platform/identity-db/postgres/<secret-name>.yaml
+git add infra/gitops/platform/identity-db/postgres/kustomization.yaml
 git commit -m "feat: add <secret-name> sealed secret"
 git push
 ```
@@ -303,7 +303,7 @@ kubeseal --controller-namespace kube-system `
   --controller-name sealed-secrets-controller `
   --format yaml `
   -f temp-secret.yaml `
-  -w infra\gitops\apps\<folder>\<secret-name>.yaml; `
+  -w infra\gitops\platform\identity-db\postgres\<secret-name>.yaml; `
 Remove-Item temp-secret.yaml
 ```
 
@@ -319,7 +319,7 @@ kubeseal --controller-namespace kube-system ^
   --controller-name sealed-secrets-controller ^
   --format yaml ^
   -f temp-secret.yaml ^
-  -w infra\gitops\apps\<folder>\<secret-name>.yaml && ^
+  -w infra\gitops\platform\identity-db\postgres\<secret-name>.yaml && ^
 del temp-secret.yaml
 ```
 
@@ -370,7 +370,7 @@ envFrom:
 
 ### `workspace-mongodb-secret` — MongoDB Connection
 
-**Location:** `infra/gitops/infra/workspace-mongodb/sealed-secret.yaml`
+**Location:** `infra/gitops/platform/workspace-db/sealed-secret.yaml`
 **Namespace:** `workspace`
 
 | Key         | Description                    |
