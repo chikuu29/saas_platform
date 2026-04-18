@@ -1,0 +1,42 @@
+# Helm values for loki-stack
+# Loki 3.1.0 image override — default 2.6.1 is incompatible with Grafana 11.x
+
+loki:
+  enabled: true
+  # Override image — chart default (2.6.1) doesn't support Grafana 11.x
+  # health check query (vector() function requires Loki 3.x)
+  image:
+    repository: grafana/loki
+    tag: 3.1.0
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+promtail:
+  enabled: true
+  # Promtail runs as DaemonSet — scrapes all pod logs on every node
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+grafana:
+  # Grafana is managed by kube-prometheus-stack — disable here
+  enabled: false
+  sidecar:
+    datasources:
+      enabled: false
+
+prometheus:
+  enabled: false

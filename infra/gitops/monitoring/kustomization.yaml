@@ -2,12 +2,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - namespace.yaml
-  - kube-prometheus-stack/
-  - loki-stack/
+  # ArgoCD Applications (Helm multi-source — values pulled from Git)
+  - prometheus-app.yaml
+  - loki-app.yaml
+  # Standalone Ingress resources (with custom annotations)
+  - grafana-ingress.yaml
+  - prometheus-ingress.yaml
+  - alertmanager-ingress.yaml
+  # Dashboards and alerting rules
   - dashboards/
-  - grafana-ingress.yaml     # Standalone Ingress for grafana.local
-  - prometheus-ingress.yaml  # Standalone Ingress for prometheus.local
-  - alertmanager-ingress.yaml # Standalone Ingress for alertmanager.local
-  # alerting/ uses PrometheusRule CRD — re-add after kube-prometheus-stack is fully synced
   - alerting/
-

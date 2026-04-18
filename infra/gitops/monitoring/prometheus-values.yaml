@@ -8,8 +8,7 @@ grafana:
   # Inline password for local dev — change for production via SealedSecret
   adminPassword: "admin"
 
-  # Ingress is managed by standalone grafana-ingress.yaml (has custom annotations)
-  # Disabled here to avoid NGINX webhook duplicate host+path conflict
+  # Ingress is managed by standalone grafana-ingress.yaml
   ingress:
     enabled: false
 
@@ -33,8 +32,7 @@ grafana:
       enabled: true
 
   # Pre-configure Loki datasource alongside Prometheus
-  # Service name = <releaseName> from loki-stack helmchart.yaml
-  # Using FQDN for reliable DNS resolution across namespaces
+  # Service name = release name from loki-app.yaml
   additionalDataSources:
     - name: Loki
       type: loki

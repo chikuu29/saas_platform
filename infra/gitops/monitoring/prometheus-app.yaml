@@ -1,9 +1,5 @@
-# kube-prometheus-stack — managed by ArgoCD via Helm.
-# Includes: Prometheus, Grafana, Alertmanager, kube-state-metrics, node-exporter.
-#
-# Uses multi-source so ArgoCD pulls the chart from upstream Helm registry
-# while reading values.yaml from our Git repo. This ensures Git changes
-# to values.yaml are detected and synced automatically.
+# kube-prometheus-stack — Prometheus, Grafana, Alertmanager, kube-state-metrics, node-exporter.
+# Multi-source: chart from upstream Helm registry, values from this Git repo.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -14,17 +10,15 @@ metadata:
 spec:
   project: default
   sources:
-    # Source 1: Helm chart from upstream registry
+    # Source 1: Helm chart from upstream
     - chart: kube-prometheus-stack
       repoURL: https://prometheus-community.github.io/helm-charts
       targetRevision: 67.9.0
       helm:
         releaseName: kube-prometheus-stack
         valueFiles:
-          # $values references our Git repo (Source 2) — ArgoCD resolves
-          # this path relative to the Git repo root
-          - $values/infra/gitops/monitoring/kube-prometheus-stack/values.yaml
-    # Source 2: Git repo providing the values file
+          - $values/infra/gitops/monitoring/prometheus-values.yaml
+    # Source 2: Git repo — provides the values file
     - repoURL: https://github.com/chikuu29/saas_platform.git
       targetRevision: HEAD
       ref: values
