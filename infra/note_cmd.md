@@ -144,3 +144,24 @@ kubectl exec -it -n workspace deployment/workspace-web     -- /bin/sh
 
 
 kubectl exec -n workspace deployment/workspace-backend -- env | findstr "OAUTH_CLIENT"
+
+
+
+
+
+# Step 1: Generate temp secret (UTF-8 safe)
+kubectl create secret generic my-secret-name `
+  --from-literal=KEY_ONE=value1 `
+  --from-literal=KEY_TWO=value2 `
+  --namespace=workspace `
+  --dry-run=client -o yaml | Set-Content -Encoding utf8 temp-secret.yaml
+
+# Step 2: Seal directly (no encoding conversion needed!)
+kubeseal --controller-namespace kube-system `
+  --controller-name sealed-secrets-controller `
+  --format yaml `
+  -f temp-secret.yaml `
+  -w infra\gitops\apps\workspace\my-secret-name.yaml
+
+# Step 3: Delete the plain secret
+Remove-Item temp-secret.yaml
