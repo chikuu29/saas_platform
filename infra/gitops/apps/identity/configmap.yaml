@@ -8,6 +8,7 @@ metadata:
   namespace: identity
 data:
   ENV: "production"
+  LOG_TO_FILE: "false"
   DOMAIN_NAME: "https://identity.local"
   CORS_ORIGINS: "https://identity.local,https://workspace.local,http://localhost"
   POLICY_ENGINE: "local"

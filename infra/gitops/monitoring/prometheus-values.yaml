@@ -1,0 +1,156 @@
+# Helm values for kube-prometheus-stack
+# Tuned for local k3d cluster — lightweight footprint, full observability enabled.
+
+# ── Grafana ────────────────────────────────────────────────────────────────────
+grafana:
+  enabled: true
+  adminUser: admin
+  # Inline password for local dev — change for production via SealedSecret
+  adminPassword: "admin"
+
+  # Ingress is managed by standalone grafana-ingress.yaml
+  ingress:
+    enabled: false
+
+  # Grafana resource allocation — modest for local dev, enough for real use
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+  # Dashboards provisioned from ConfigMaps in the monitoring namespace
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: monitoring
+    datasources:
+      enabled: true
+
+  # Pre-configure Loki datasource alongside Prometheus
+  # Service name = release name from loki-app.yaml
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki-stack.monitoring.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        maxLines: 1000
+
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 2Gi
+
+# ── Prometheus ─────────────────────────────────────────────────────────────────
+prometheus:
+  enabled: true
+
+  # Ingress is managed by standalone prometheus-ingress.yaml
+  ingress:
+    enabled: false
+
+  prometheusSpec:
+    # Retain 15 days of metrics data
+    retention: 15d
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+    # Auto-discover ServiceMonitors and PodMonitors in any namespace
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # Scrape pods annotated with prometheus.io/scrape: "true"
+    additionalScrapeConfigs:
+      - job_name: saas-identity-backend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [identity]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+      - job_name: saas-workspace-backend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [workspace]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+# ── Alertmanager ───────────────────────────────────────────────────────────────
+alertmanager:
+  enabled: true
+
+  # Ingress is managed by standalone alertmanager-ingress.yaml
+  ingress:
+    enabled: false
+
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ── Node Exporter ─────────────────────────────────────────────────────────────
+nodeExporter:
+  enabled: true
+
+# ── Kube State Metrics ────────────────────────────────────────────────────────
+kubeStateMetrics:
+  enabled: true

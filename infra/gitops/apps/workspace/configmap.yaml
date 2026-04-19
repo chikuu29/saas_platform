@@ -12,6 +12,7 @@ data:
   API_V1_STR: "/v1"
   PORT: "8001"
   LOG_LEVEL: "INFO"
+  LOG_TO_FILE: "false"
   DATABASE_NAME: "workspace_db"
   BACKEND_CORS_ORIGINS: '["https://workspace.local","https://identity.local","http://localhost"]'
   # Identity Server endpoints — cross-namespace via Kubernetes DNS

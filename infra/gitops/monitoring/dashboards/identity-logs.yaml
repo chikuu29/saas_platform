@@ -1,0 +1,243 @@
+# Backend Logs Dashboard — auto-provisioned via ConfigMap sidecar.
+# Visualizes log levels (ERROR, WARNING, INFO, DEBUG) using Loki datasource.
+# Supports both identity-backend and workspace-backend via dropdown filter.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-identity-logs
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  identity-logs.json: |
+    {
+      "title": "SaaS Platform — Backend Logs",
+      "uid": "saas-backend-logs",
+      "schemaVersion": 38,
+      "version": 2,
+      "tags": ["saas", "logs", "loki", "identity", "workspace"],
+      "time": { "from": "now-1h", "to": "now" },
+      "refresh": "10s",
+      "timezone": "browser",
+      "editable": true,
+      "graphTooltip": 1,
+      "templating": {
+        "list": [
+          {
+            "name": "service",
+            "label": "Service",
+            "type": "custom",
+            "current": { "text": "identity-backend", "value": "identity-backend" },
+            "options": [
+              { "text": "identity-backend", "value": "identity-backend", "selected": true },
+              { "text": "workspace-backend", "value": "workspace-backend", "selected": false }
+            ],
+            "includeAll": false,
+            "multi": false
+          },
+          {
+            "name": "namespace",
+            "label": "Namespace",
+            "type": "custom",
+            "current": { "text": "identity", "value": "identity" },
+            "options": [
+              { "text": "identity", "value": "identity", "selected": true },
+              { "text": "workspace", "value": "workspace", "selected": false }
+            ],
+            "includeAll": false,
+            "multi": false
+          }
+        ]
+      },
+      "panels": [
+
+        {
+          "id": 1,
+          "title": "🔴 Errors / min",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [{
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(ERROR|error)\" [1m]))",
+            "legendFormat": "Errors"
+          }],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 1, "color": "orange" },
+                { "value": 5, "color": "red" }
+              ]}
+            }
+          }
+        },
+
+        {
+          "id": 2,
+          "title": "⚠️ Warnings / min",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [{
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(WARNING|WARN)\" [1m]))",
+            "legendFormat": "Warnings"
+          }],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 1, "color": "yellow" },
+                { "value": 10, "color": "orange" }
+              ]}
+            }
+          }
+        },
+
+        {
+          "id": 3,
+          "title": "ℹ️ Info / min",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [{
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)INFO\" [1m]))",
+            "legendFormat": "Info"
+          }],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "fixed", "fixedColor": "blue" }
+            }
+          }
+        },
+
+        {
+          "id": 4,
+          "title": "🐛 Debug / min",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [{
+            "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)DEBUG\" [1m]))",
+            "legendFormat": "Debug"
+          }],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "fixed", "fixedColor": "purple" }
+            }
+          }
+        },
+
+        {
+          "id": 10,
+          "title": "📊 Log Volume by Level",
+          "description": "Log line count over time grouped by level",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [
+            {
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)error\" [1m]))",
+              "legendFormat": "ERROR"
+            },
+            {
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(warning|warn)\" [1m]))",
+              "legendFormat": "WARNING"
+            },
+            {
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)info\" [1m]))",
+              "legendFormat": "INFO"
+            },
+            {
+              "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)debug\" [1m]))",
+              "legendFormat": "DEBUG"
+            }
+          ],
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["sum", "mean", "max"] }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2, "fillOpacity": 30, "gradientMode": "opacity", "stacking": { "mode": "normal" }, "drawStyle": "bars" }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "ERROR" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+              { "matcher": { "id": "byName", "options": "WARNING" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+              { "matcher": { "id": "byName", "options": "INFO" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
+              { "matcher": { "id": "byName", "options": "DEBUG" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } }] }
+            ]
+          }
+        },
+
+        {
+          "id": 20,
+          "title": "🔴 Error Logs — Live Stream",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [{
+            "expr": "{namespace=\"$namespace\", app=\"$service\"} |~ \"(?i)(ERROR|Traceback|exception|Exception)\"",
+            "maxLines": 200
+          }],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          }
+        },
+
+        {
+          "id": 30,
+          "title": "📋 All Logs",
+          "description": "Full log stream — use the Service dropdown to switch between backends",
+          "type": "logs",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [{
+            "expr": "{namespace=\"$namespace\", app=\"$service\"}",
+            "maxLines": 500
+          }],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          }
+        }
+
+      ]
+    }
