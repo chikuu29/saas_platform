@@ -16,3 +16,4 @@
 
 .github/workflows/**  merge=ours
 .gitmodules           merge=ours
+PROJECT_ARCHITECTURE.md merge=ours
