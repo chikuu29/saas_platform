@@ -33,7 +33,7 @@ $projects = @(
         Path = Join-Path $root "apps\work_space\web"
         InstallCommand = "npm install"
         DependencyPath = "node_modules"
-        Command = "npm run dev"
+        Command = "pnpm dev"
     }
 )
 
