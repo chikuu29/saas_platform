@@ -31,7 +31,7 @@ data:
   VITE_REDIRECT_URL: "https://workspace.local/auth/callback"
 
   # ── Identity provider API base (for OIDC discovery, token exchange) ─────────
-  VITE_IDENTITY_PROVIDER_API_URL: "https://identity.local/api"
+  VITE_IDENTITY_PROVIDER_API_URL: "/identity"
 
   # ── Client identification tag ───────────────────────────────────────────────
   VITE_X_CLIENT_ID: "PRODUCTION"

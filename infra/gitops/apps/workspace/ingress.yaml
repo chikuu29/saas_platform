@@ -1,4 +1,8 @@
-# Workspace Ingress — Split into two Ingress resources, mirroring identity pattern.
+# Workspace Ingress — Three YAML documents in this file:
+#
+#   1. workspace-ingress-api   — /backend/* and /identity/* with prefix-strip rewrite
+#   2. workspace-ingress-web   — /public, /health, /metrics, / passthrough
+#   3. identity-backend-external Service — ExternalName stub for cross-namespace routing
 #
 # WHY TWO INGRESS RESOURCES?
 # nginx.ingress.kubernetes.io/rewrite-target is a PER-INGRESS annotation.
@@ -75,6 +79,33 @@ spec:
                 name: workspace-backend
                 port:
                   number: 8001
+
+          # ── Identity server proxy (cross-namespace) ───────────────────────
+          # The workspace frontend calls the identity server with the prefix
+          # /identity (set in api.ts getBaseUrl("identity") and mirrored in
+          # the Vite dev proxy in vite.config.ts).
+          #
+          # This ingress rule strips the /identity prefix and forwards the
+          # bare path to the identity-backend service in the identity namespace.
+          #
+          # Request chain:
+          #   Browser:  https://workspace.local/identity/account/organization/users
+          #   nginx:    strips /identity (rewrite /$2) → /account/organization/users
+          #   Identity: FastAPI receives /account/organization/users → handler runs ✅
+          #
+          # WHY here (workspace ingress) and NOT identity.local?
+          # The workspace frontend is served from workspace.local. Cross-origin
+          # fetch to identity.local would require CORS credentials + cookie
+          # sharing across two origins — complex and fragile. Proxying through
+          # the same origin (/identity on workspace.local) keeps cookies and
+          # auth headers on a single origin.
+          - path: /identity(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: identity-backend-external
+                port:
+                  number: 8000
 ---
 # ─── Ingress 2: Passthrough — no rewrite ─────────────────────────────────────
 # All paths in this ingress reach the backend/SPA with their full path intact.
@@ -139,3 +170,29 @@ spec:
                 name: workspace-web
                 port:
                   number: 80
+---
+# ─── ExternalName Service: identity-backend cross-namespace bridge ────────────
+# nginx-ingress rules can ONLY reference Services in the SAME namespace.
+# identity-backend lives in the `identity` namespace; this ExternalName stub
+# in the `workspace` namespace resolves via CNAME to its cluster-internal FQDN.
+#
+# This replaces the separate identity-backend-external-svc.yaml file —
+# consolidated here to keep all ingress-related resources in one place.
+#
+# Traffic path:
+#   workspace-ingress-api (/identity/* rule)
+#     → identity-backend-external   (ExternalName, workspace ns)
+#     → identity-backend.identity.svc.cluster.local:8000  (actual pod)
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-backend-external
+  namespace: workspace
+spec:
+  type: ExternalName
+  externalName: identity-backend.identity.svc.cluster.local
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
