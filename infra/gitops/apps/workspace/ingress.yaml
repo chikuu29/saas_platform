@@ -1,23 +1,32 @@
-# Workspace Ingress — Four YAML documents in this file:
+# Workspace Ingress — Three YAML documents in this file:
 #
-#   1. workspace-ingress-api      — /backend/* → workspace-backend  (prefix-strip rewrite)
-#   2. workspace-ingress-identity — /identity/* → identity-backend   (dedicated, HTTP upstream)
-#   3. workspace-ingress-web      — /public, /health, /metrics, /   (no rewrite)
-#   4. identity-backend-external  — ExternalName Service (cross-namespace bridge)
+#   1. workspace-ingress-api  — /backend/* and /identity/* with prefix-strip rewrite
+#   2. workspace-ingress-web  — /public, /health, /metrics, / passthrough (no rewrite)
+#   3. identity-backend-external Service — ExternalName bridge to identity namespace
 #
-# WHY SEPARATE INGRESS PER SERVICE GROUP?
-# nginx.ingress.kubernetes.io/rewrite-target is a PER-INGRESS annotation.
-# workspace-backend and identity-backend are different upstreams with different
-# protocol requirements (identity must be explicit HTTP, workspace-backend is HTTP too
-# but needs different CORS/proxy settings). Mixing them in one Ingress resource
-# causes annotation conflicts and 502 errors.
+# WHY TWO INGRESS RESOURCES (not three)?
+# nginx admission webhook enforces: a given host+path can only exist in ONE Ingress.
+# Attempting to declare the same host+path in a second Ingress is rejected at apply time.
+# Therefore /backend and /identity must share workspace-ingress-api.
 #
-# WHY /backend (not /api):
-# api.ts uses /backend as base URL. Matching prefix in Vite proxy AND K8s ingress
-# means zero environment-specific URL differences between dev and prod.
+# WHY backend-protocol: HTTP on workspace-ingress-api?
+# nginx-ingress defaults to attempting HTTPS when proxying to upstreams behind a TLS
+# ingress. Both workspace-backend (port 8001) and identity-backend (port 8000) speak
+# plain HTTP — they rely on nginx-ingress for TLS termination. Without this annotation,
+# nginx sends an SSL ClientHello to an HTTP socket → immediate 502 Bad Gateway.
+#
+# Full request chain:
+#   Client:   https://workspace.local/backend/v1/users
+#   nginx-ic: TLS terminate → rewrite /$2 → HTTP proxy_pass workspace-backend:8001
+#   FastAPI:  receives /v1/users ✅
+#
+#   Client:   https://workspace.local/identity/account/organization/users
+#   nginx-ic: TLS terminate → rewrite /$2 → HTTP proxy_pass identity-backend-external:8000
+#   ExternalName CNAME: → identity-backend.identity.svc.cluster.local:8000
+#   FastAPI:  receives /account/organization/users ✅
 
 
-# ─── Ingress 1: /backend → workspace backend (prefix-strip rewrite) ───────────
+# ─── Ingress 1: /backend and /identity → rewrite strip prefix ─────────────────
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -33,9 +42,14 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
-    # Rewrite: captures everything after /backend and replaces the full path.
-    #   /backend/v1/users     → /v1/users
-    #   /backend/docs         → /docs
+    # ── 502 fix ──────────────────────────────────────────────────────────────
+    # Both workspace-backend:8001 and identity-backend:8000 are plain HTTP.
+    # nginx-ingress must NOT attempt an HTTPS handshake to these upstreams.
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    # ─────────────────────────────────────────────────────────────────────────
+    # Rewrite: strips the matched prefix, passes the rest.
+    #   /backend/v1/users                  → /v1/users
+    #   /identity/account/organization/... → /account/organization/...
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
@@ -46,6 +60,7 @@ spec:
     - host: workspace.local
       http:
         paths:
+          # Workspace backend — all API calls and Swagger UI
           - path: /backend(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
@@ -53,66 +68,9 @@ spec:
                 name: workspace-backend
                 port:
                   number: 8001
----
-# ─── Ingress 2: /identity → identity-backend (dedicated, isolated) ────────────
-#
-# WHY A SEPARATE INGRESS for /identity?
-#
-# 1. backend-protocol: "HTTP" is required.
-#    nginx-ingress defaults to attempting HTTPS on any upstream when the cluster
-#    uses TLS termination. Without this annotation, nginx sends an HTTPS handshake
-#    to identity-backend port 8000 (HTTP only) → immediate 502 Bad Gateway.
-#
-# 2. upstream-vhost sets the Host header on proxied requests.
-#    Without this, nginx sends Host: workspace.local to identity-backend.
-#    FastAPI's middleware or CORS checks may reject the mismatched host.
-#
-# 3. rewrite-target: /$2 strips the /identity prefix.
-#    /identity/account/organization/users → /account/organization/users
-#    Identity FastAPI receives the bare path its routers expect.
-#
-# Traffic chain:
-#   Browser  → workspace.local/identity/account/organization/users  (HTTPS)
-#   nginx-ic → strips TLS, rewrites to /account/organization/users
-#            → proxy_pass HTTP to identity-backend-external:8000
-#   ExternalName CNAME → identity-backend.identity.svc.cluster.local:8000
-#   FastAPI  → /account/organization/users → handler ✅
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: workspace-ingress-identity
-  namespace: workspace
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
-    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    # ── Critical for ExternalName + HTTP upstream ─────────────────────────────
-    # Tells nginx-ingress to proxy using plain HTTP (not HTTPS) to the upstream.
-    # Without this, nginx attempts an SSL handshake to port 8000 → 502.
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    # Sets the Host header on the proxied request to the actual upstream FQDN.
-    # Prevents FastAPI/middleware from seeing "workspace.local" as the Host.
-    nginx.ingress.kubernetes.io/upstream-vhost: "identity-backend.identity.svc.cluster.local"
-    # CORS: identity API is consumed by the workspace frontend JS
-    nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-origin: "https://workspace.local"
-    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
-    # Rewrite: strips /identity prefix before forwarding to identity-backend.
-    #   /identity/account/organization/users → /account/organization/users
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - workspace.local
-  rules:
-    - host: workspace.local
-      http:
-        paths:
+
+          # Identity server proxy (cross-namespace via ExternalName service).
+          # Strips /identity prefix so FastAPI receives the bare path.
           - path: /identity(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
@@ -121,7 +79,7 @@ spec:
                 port:
                   number: 8000
 ---
-# ─── Ingress 3: Passthrough — static files, health, SPA catch-all ─────────────
+# ─── Ingress 2: Passthrough — static files, health probes, SPA catch-all ──────
 # No rewrite annotation — all paths reach backends with their full path intact.
 #
 # /public  — FastAPI StaticFiles at /public/storage (file uploads/downloads)
@@ -187,8 +145,9 @@ spec:
 # No pods, no kube-proxy rules — pure DNS redirect, zero overhead.
 #
 # Traffic path:
-#   workspace-ingress-identity → identity-backend-external (ExternalName, workspace ns)
-#   CNAME resolve              → identity-backend.identity.svc.cluster.local:8000
+#   workspace-ingress-api (/identity/* rule)
+#     → identity-backend-external   (ExternalName, workspace ns)
+#     → identity-backend.identity.svc.cluster.local:8000  (actual pod)
 apiVersion: v1
 kind: Service
 metadata:
