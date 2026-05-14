@@ -22,7 +22,7 @@ data:
 
   # ── OAuth2 / SSO ────────────────────────────────────────────────────────────
   # Full public URL of the identity server's authorization endpoint.
-  VITE_OAUTH_URL: "https://identity.suryaai.online/api/oauth2/authorize"
+  VITE_OAUTH_URL: "https://identity.suryaai.online/oauth2/authorize"
 
   # OAuth2 client ID registered in the identity server.
   VITE_CLIENT_ID: "work_space_platform"

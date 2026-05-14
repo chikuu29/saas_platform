@@ -12,6 +12,8 @@ kubectl -n ingress-nginx get secret ingress-nginx-controller -o jsonpath="{.data
 
 
 
+kubectl port-forward svc/identity-postgres 5433:5432 -n identity
+
 
 1. See Everything in a Namespace (Most Useful)
 kubectl get all -n argocd
