@@ -7,6 +7,7 @@ kind: Kustomization
 resources:
   - configmap.yaml
   - workspace-app-secret.yaml          # App-level SealedSecret: OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, SECRET_KEY
+  - workspace-storage-pvc.yaml         # Persistent storage for uploads
   - workspace-backend-deployment.yaml
   - workspace-backend-service.yaml
   - workspace-backend-hpa.yaml

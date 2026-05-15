@@ -1,0 +1,18 @@
+# PersistentVolumeClaim for workspace backend storage.
+# This ensures that uploaded files and other local storage data persist
+# across pod restarts and deployments.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workspace-storage-pvc
+  namespace: workspace
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # Uses the default local-path storage provisioner (k3d/k3s built-in).
+  # For multi-replica deployments, change to ReadWriteMany with a shared
+  # storage provisioner (e.g., NFS, Longhorn) if replicas need to share the same data.
+  storageClassName: local-path
