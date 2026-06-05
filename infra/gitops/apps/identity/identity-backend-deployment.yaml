@@ -37,7 +37,7 @@ spec:
       containers:
         - name: identity-backend
           # IMAGE TAG — update this value to trigger a rolling deploy via GitOps
-          image: docker.io/cchiku1999/saas-identity-backend:14192ab4006e6313e4237607f7acf2875cbc6841
+          image: docker.io/cchiku1999/saas-identity-backend:5187f0c2c74ad562ae70d928834422403930a23b
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
