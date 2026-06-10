@@ -237,6 +237,40 @@ Register new widgets in `core/widgets/index.ts`.
 
 ---
 
+## Fullscreen & Maximization (useMaximize)
+
+When enabling fullscreen or maximization layout modes for pages, cards, or widgets:
+- **Do not wrap components in deep JSX nesting** (e.g. `<MaximizeContainer>` with render props) unless needed for legacy context-dependent children.
+- **Use the `useMaximize` custom hook** instead. It manages the browser-native Fullscreen API and falls back gracefully to a CSS fixed overlay mode if blocked/unsupported.
+- **API Signature**:
+  ```typescript
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { isMaximized, toggle, fullscreenProps, contentWrapperProps } = useMaximize(containerRef, {
+    maxW: "800px",         // Width of the content card when maximized (e.g. "800px", "1400px")
+    centerContent: true,   // true: centers card vertically & horizontally; false: top-aligns card, centers horizontally
+  });
+  ```
+- **JSX Bindings**:
+  Apply `ref={containerRef}` and `{...fullscreenProps}` to the outer-most container element, and spread `{...contentWrapperProps}` on the direct child wrapper:
+  ```tsx
+  <Box ref={containerRef} {...fullscreenProps}>
+    <Box {...contentWrapperProps}>
+      <Box p={isMaximized ? 8 : 6} bg="bg.panel" borderRadius="2xl">
+        <IconButton onClick={toggle}>
+          {isMaximized ? <Minimize2 /> : <Maximize2 />}
+        </IconButton>
+        {/* Content */}
+      </Box>
+    </Box>
+  </Box>
+  ```
+- **Performance / Render Isolation**:
+  Using a local ref-bound hook limits re-render cycles to the host component and its memoized children. It avoids global React context thrashing.
+- **CSS Flexbox Margin Constraint**:
+  `contentWrapperProps` dynamically enables/disables the vertical margin `my="auto"` depending on the `centerContent` parameter. This prevents vertical margins from overriding parent container alignments (`align-items: flex-start`) when top-aligning content.
+
+---
+
 ## Backend API Awareness
 
 | API | Backend | Purpose |
