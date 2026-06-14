@@ -223,9 +223,20 @@ Register new widgets in `core/widgets/index.ts`.
 ## How to Add New Features
 
 ### New App Module
-1. Create `src/features/modules/{appName}/` with view components
-2. Register in `AppRegistry.ts`: `{ viewName: () => import("@/features/modules/{appName}/ViewComponent") }`
-3. Add PBAC: `{ component: () => import(...), permissions: "ROLE.SCOPE.*" }`
+1. Create `src/features/modules/{appName}/` with view components.
+2. **Auto-Discovery (Zero Config)**: Any file placed directly inside `src/features/modules/{appName}/{ViewName}.tsx` or `src/features/modules/{appName}/{ViewName}/index.tsx` is automatically resolved and routeable under `/:org/workspace/app/{appName}/{ViewName}` (case-insensitive) with zero registry setup.
+3. **Local module registry (Recommended for custom configurations)**: If a view name differs from the filename, or requires specific Policy-Based Access Control (PBAC) permissions, or layouts, define it inside `src/features/modules/{appName}/registry.ts` which exports a default `registry` object of type `AppModuleConfig`. The core registry automatically scans, imports, and merges all local module registries at startup. You DO NOT need to touch the core `AppRegistry.ts` file!
+   ```typescript
+   import type { AppModuleConfig } from "@/core/registry/AppRegistry";
+
+   export const registry: AppModuleConfig = {
+       layout: () => import("@/theme/layouts/workspace"),
+       customViewName: {
+           component: () => import("./CustomViewComponent"),
+           permissions: "ROLE.SCOPE.READ"
+       }
+   };
+   ```
 
 ### New Widget
 1. Create `src/core/widgets/{WidgetName}.tsx`
