@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: workspace-web
-          image: docker.io/cchiku1999/saas-workspace-web:120285428baaba9d866d4f1e946c4f727f943ecd
+          image: docker.io/cchiku1999/saas-workspace-web:661fa3ce6651e4b4bb42392918a512552f094acc
           imagePullPolicy: Always
           ports:
             - containerPort: 80
